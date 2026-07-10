@@ -1,5 +1,7 @@
 package com.codershubinc.aaxion_mob.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,11 +15,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +28,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,7 +46,7 @@ import java.util.Locale
 @Composable
 fun FileExplorerScreen(
     files: List<FileItem>,
-    currentPath: String = "/",
+    currentPath: String,
     baseUrl: String,
     token: String,
     onFileClick: (FileItem) -> Unit,
@@ -147,6 +151,9 @@ fun FileExplorerScreen(
 
 @Composable
 fun FileListCardItem(file: FileItem, baseUrl: String, token: String, onClick: () -> Unit) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -225,18 +232,51 @@ fun FileListCardItem(file: FileItem, baseUrl: String, token: String, onClick: ()
                 }
             }
             
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.2f),
-                modifier = Modifier.size(16.dp)
-            )
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Options",
+                        tint = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Download") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            val encodedPath = URLEncoder.encode(file.rawPath, StandardCharsets.UTF_8.toString())
+                            val downloadUrl = "$baseUrl/files/download?path=$encodedPath&tkn=$token"
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
+                            context.startActivity(intent)
+                        }
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 fun FileGridCardItem(file: FileItem, baseUrl: String, token: String, onClick: () -> Unit) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -254,8 +294,7 @@ fun FileGridCardItem(file: FileItem, baseUrl: String, token: String, onClick: ()
                 shape = RoundedCornerShape(20.dp)
             )
             .clickable { onClick() }
-            .padding(12.dp),
-        contentAlignment = Alignment.Center
+            .padding(12.dp)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -315,6 +354,45 @@ fun FileGridCardItem(file: FileItem, baseUrl: String, token: String, onClick: ()
                     color = Color.White.copy(alpha = 0.3f),
                     fontSize = 11.sp,
                     modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier.align(Alignment.TopEnd)
+        ) {
+            IconButton(
+                onClick = { menuExpanded = true },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Options",
+                    tint = Color.White.copy(alpha = 0.5f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Download") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        val encodedPath = URLEncoder.encode(file.rawPath, StandardCharsets.UTF_8.toString())
+                        val downloadUrl = "$baseUrl/files/download?path=$encodedPath&tkn=$token"
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
+                        context.startActivity(intent)
+                    }
                 )
             }
         }

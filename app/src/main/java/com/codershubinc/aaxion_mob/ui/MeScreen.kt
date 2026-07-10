@@ -52,7 +52,7 @@ fun MeScreen(
             storageError = null
             try {
                 val service = Fetcher.getInstance().getService(serverUri)
-                val response = service.getStorageInfo(token)
+                val response = service.getStorageInfo("Bearer $token")
                 if (response.isSuccessful && response.body() != null) {
                     storageInfo = response.body()
                 } else {

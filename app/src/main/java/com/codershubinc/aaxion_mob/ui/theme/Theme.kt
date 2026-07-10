@@ -9,35 +9,39 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = ModernPrimary,
+    secondary = ModernSecondary,
+    tertiary = Pink80,
+    background = ModernBackground,
+    surface = ModernSurface,
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onBackground = ModernOnBackground,
+    onSurface = ModernOnSurface
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
+    primary = ModernPrimary,
+    secondary = ModernSecondary,
+    tertiary = Pink40,
     background = Color(0xFFFFFBFE),
     surface = Color(0xFFFFFBFE),
     onPrimary = Color.White,
     onSecondary = Color.White,
     onTertiary = Color.White,
     onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    onSurface = Color(0xFF1C1B1F)
 )
 
 @Composable
 fun AaxionMobTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false, // Set to false to enforce our custom modern palette
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -47,7 +51,7 @@ fun AaxionMobTheme(
         }
 
         darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        else -> DarkColorScheme // Force dark theme for the sleek NullVoid look as requested
     }
 
     MaterialTheme(

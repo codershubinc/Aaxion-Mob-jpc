@@ -7,7 +7,7 @@ import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -17,15 +17,45 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.codershubinc.aaxion_mob.models.StorageInfoResponse
+import com.codershubinc.aaxion_mob.utils.Fetcher
 import java.util.Locale
 
 @Composable
 fun StorageInfoTile(
-    storageInfo: StorageInfoResponse?,
-    isLoading: Boolean,
-    errorMessage: String?,
+    serverUri: String,
+    token: String,
     modifier: Modifier = Modifier
 ) {
+    var storageInfo by remember { mutableStateOf<StorageInfoResponse?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(serverUri, token) {
+        if (serverUri.isNotEmpty() && token.isNotEmpty()) {
+            isLoading = true
+            errorMessage = null
+            try {
+                val service = Fetcher.getInstance().getService(serverUri)
+                val response = service.getStorageInfo("Bearer $token")
+                if (response.isSuccessful && response.body() != null) {
+                    storageInfo = response.body()
+                } else {
+                    errorMessage = "Server returned error: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                errorMessage = "Connection failed: ${e.localizedMessage ?: "Unknown error"}"
+            } finally {
+                isLoading = false
+            }
+        } else {
+            errorMessage = "Server connection is not established."
+            isLoading = false
+        }
+    }
+
+    val info = storageInfo
+    val error = errorMessage
+
     ModernCard(
         modifier = modifier.fillMaxWidth()
     ) {
@@ -62,7 +92,7 @@ fun StorageInfoTile(
                     modifier = Modifier.size(24.dp)
                 )
             }
-        } else if (errorMessage != null) {
+        } else if (error != null) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -78,7 +108,7 @@ fun StorageInfoTile(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = errorMessage,
+                    text = error,
                     color = MaterialTheme.colorScheme.error,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
@@ -86,8 +116,8 @@ fun StorageInfoTile(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
-        } else if (storageInfo != null) {
-            val progress = (storageInfo.usagePercentage / 100f).toFloat().coerceIn(0f, 1f)
+        } else if (info != null) {
+            val progress = (info.usagePercentage / 100f).toFloat().coerceIn(0f, 1f)
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -95,13 +125,13 @@ fun StorageInfoTile(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${String.format(Locale.US, "%.1f", storageInfo.usagePercentage)}% Used",
+                    text = "${String.format(Locale.US, "%.1f", info.usagePercentage)}% Used",
                     color = Color.White,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "${formatBytes(storageInfo.used)} / ${formatBytes(storageInfo.total)}",
+                    text = "${formatBytes(info.used)} / ${formatBytes(info.total)}",
                     color = Color.White.copy(alpha = 0.5f),
                     fontSize = 12.sp
                 )
@@ -122,12 +152,12 @@ fun StorageInfoTile(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Available: ${formatBytes(storageInfo.available)}",
+                text = "Available: ${formatBytes(info.available)}",
                 color = Color.White.copy(alpha = 0.4f),
                 fontSize = 12.sp
             )
 
-            if (storageInfo.externalDevices.isNotEmpty()) {
+            if (info.externalDevices.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(
                     color = Color.White.copy(alpha = 0.08f),
@@ -144,7 +174,7 @@ fun StorageInfoTile(
                     letterSpacing = 0.8.sp
                 )
 
-                storageInfo.externalDevices.forEach { device ->
+                info.externalDevices.forEach { device ->
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),

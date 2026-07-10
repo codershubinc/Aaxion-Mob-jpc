@@ -25,11 +25,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.codershubinc.aaxion_mob.models.StorageInfoResponse
 import com.codershubinc.aaxion_mob.ui.components.BackgroundGlows
 import com.codershubinc.aaxion_mob.ui.components.ModernCard
 import com.codershubinc.aaxion_mob.ui.components.StorageInfoTile
-import com.codershubinc.aaxion_mob.utils.Fetcher
 
 @Composable
 fun MeScreen(
@@ -42,32 +40,6 @@ fun MeScreen(
     val isTablet = configuration.screenWidthDp >= 600
     val scrollState = rememberScrollState()
 
-    var storageInfo by remember { mutableStateOf<StorageInfoResponse?>(null) }
-    var isLoadingStorage by remember { mutableStateOf(true) }
-    var storageError by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(serverUri, token) {
-        if (serverUri.isNotEmpty() && token.isNotEmpty()) {
-            isLoadingStorage = true
-            storageError = null
-            try {
-                val service = Fetcher.getInstance().getService(serverUri)
-                val response = service.getStorageInfo("Bearer $token")
-                if (response.isSuccessful && response.body() != null) {
-                    storageInfo = response.body()
-                } else {
-                    storageError = "Server returned error: ${response.code()}"
-                }
-            } catch (e: Exception) {
-                storageError = "Connection failed: ${e.localizedMessage ?: "Unknown error"}"
-            } finally {
-                isLoadingStorage = false
-            }
-        } else {
-            storageError = "Server connection is not established."
-            isLoadingStorage = false
-        }
-    }
 
     Box(
         modifier = Modifier
@@ -169,9 +141,8 @@ fun MeScreen(
                         }
 
                         StorageInfoTile(
-                            storageInfo = storageInfo,
-                            isLoading = isLoadingStorage,
-                            errorMessage = storageError,
+                            serverUri = serverUri,
+                            token = token,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -238,9 +209,8 @@ fun MeScreen(
                     Spacer(modifier = Modifier.height(32.dp))
                     
                     StorageInfoTile(
-                        storageInfo = storageInfo,
-                        isLoading = isLoadingStorage,
-                        errorMessage = storageError,
+                        serverUri = serverUri,
+                        token = token,
                         modifier = Modifier.fillMaxWidth()
                     )
                     

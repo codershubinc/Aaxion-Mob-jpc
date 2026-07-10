@@ -118,6 +118,8 @@ fun AppNavigation() {
         }
         composable("me") {
             MeScreen(
+                serverUri = serverUri,
+                token = token ?: "",
                 onExploreFiles = { navController.navigate("explorer") },
                 onLogout = {
                     scope.launch {

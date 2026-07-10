@@ -32,4 +32,8 @@ object API_ENDPOINTS {
         const val UPLOAD = "/files/upload/chunk"
         const val COMPLETE = "/files/upload/chunk/complete"
     }
+    object SYSTEM {
+        const val GET_ROOT_PATH = "/api/system/get-root-path"
+        const val STORAGE = "/api/system/storage"
+    }
 }

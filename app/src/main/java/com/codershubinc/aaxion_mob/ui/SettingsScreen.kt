@@ -2,6 +2,9 @@ package com.codershubinc.aaxion_mob.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.filled.Storage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -429,6 +432,50 @@ fun SettingsScreen(
                     }
                 }
 
+                // SECTION: Sign Out
+                // SECTION: Storage & Cache
+                SettingsSectionHeader("STORAGE & CACHE")
+                var cacheSizeString by remember { mutableStateOf("Calculating...") }
+                LaunchedEffect(Unit) {
+                    withContext(Dispatchers.IO) {
+                        val cacheDir = context.cacheDir.resolve("image_cache")
+                        val sizeBytes = if (cacheDir.exists()) {
+                            cacheDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum()
+                        } else 0L
+                        cacheSizeString = com.codershubinc.aaxion_mob.utils.IntentUtils.formatFileSize(sizeBytes)
+                    }
+                }
+                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SettingsRow(
+                            icon = Icons.Default.Storage,
+                            iconTint = StreamerOrange,
+                            title = "Image Thumbnail Cache",
+                            subtitle = "$cacheSizeString used"
+                        )
+                        TextButton(
+                            onClick = {
+                                scope.launch(Dispatchers.IO) {
+                                    val cacheDir = context.cacheDir.resolve("image_cache")
+                                    if (cacheDir.exists()) {
+                                        cacheDir.deleteRecursively()
+                                    }
+                                    withContext(Dispatchers.Main) {
+                                        cacheSizeString = "0 B"
+                                        Toast.makeText(context, "Cache cleared", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        ) {
+                            Text("CLEAR", color = StreamerOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
                 // SECTION: Sign Out
                 SettingsSectionHeader("ACCOUNT")
                 AaxionCard(

@@ -254,6 +254,212 @@ fun AaxionDriveScreen(
                     }
                 }
 
+            }
+        } else {
+            isServerOnline = false
+            serverLatencyMs = null
+        }
+    }
+
+    // Initial load
+    LaunchedEffect(serverUri, effectiveToken) {
+        if (serverUri.isNotBlank() && effectiveToken.isNotBlank()) {
+            if (viewModel.files.isEmpty()) {
+                viewModel.fetchFiles(serverUri, effectiveToken, "/", tokenManager = tokenManager)
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AaxionBg)
+    ) {
+        if (!isMobile) {
+            // ==========================================
+            // TABLET/DESKTOP RESPONSIVE LAYOUT (Collapsible / Fixed Sidebar)
+            // ==========================================
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Main Content Canvas (Uses full screen or left-padded for desktop sidebar)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = if (isDesktop && isSidebarVisible) 268.dp else 0.dp)
+                ) {
+                    when (currentTab) {
+                        0 -> DriveFilesView(
+                            serverUri = serverUri,
+                            token = effectiveToken,
+                            viewModel = viewModel,
+                            isGridView = isGridView,
+                            onToggleView = { isGridView = !isGridView },
+                            isSidebarVisible = isSidebarVisible,
+                            onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
+                            onOpenSettings = { currentTab = 3 },
+                            isTablet = true
+                        )
+                        1 -> StreamerMediaView(
+                            serverUri = serverUri,
+                            token = effectiveToken,
+                            viewModel = viewModel,
+                            isSidebarVisible = isSidebarVisible,
+                            onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
+                            isTablet = true
+                        )
+                        2 -> StorageAndHubView(
+                            serverUri = serverUri,
+                            token = effectiveToken,
+                            masterToken = activeMasterToken,
+                            lastRefreshTs = lastRefreshTs,
+                            isRefreshing = isRefreshingToken,
+                            onRefreshToken = {
+                                scope.launch {
+                                    val success = tokenManager.refreshAccessToken(serverUri)
+                                    val msg = if (success) "Access token refreshed" else "Refresh failed"
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onOpenIpSelector = { showIpSelectorModal = true },
+                            onLogout = onLogout
+                        )
+                        3 -> SettingsScreen(
+                            serverUri = serverUri,
+                            token = effectiveToken,
+                            onBackClick = { currentTab = 0 },
+                            onLogout = onLogout
+                        )
+                    }
+                }
+
+            }
+        } else {
+            // ==========================================
+            // MOBILE RESPONSIVE LAYOUT (Full Screen + Bottom Bar)
+            // ==========================================
+            Scaffold(
+                containerColor = Color.Transparent,
+                bottomBar = {
+                    NavigationBar(
+                        containerColor = AaxionSurface,
+                        contentColor = TextPrimary,
+                        tonalElevation = 0.dp,
+                        modifier = Modifier.border(
+                            width = 1.dp,
+                            color = AaxionBorder,
+                            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                        )
+                    ) {
+                        NavigationBarItem(
+                            selected = currentTab == 0,
+                            onClick = { currentTab = 0 },
+                            icon = { Icon(Icons.Default.CloudQueue, contentDescription = "Drive") },
+                            label = { Text("Drive", fontSize = 10.sp, fontWeight = if (currentTab == 0) FontWeight.Bold else FontWeight.Normal) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = AaxionPrimary,
+                                selectedTextColor = AaxionPrimary,
+                                indicatorColor = AaxionPrimary.copy(alpha = 0.15f),
+                                unselectedIconColor = TextTertiary,
+                                unselectedTextColor = TextTertiary
+                            )
+                        )
+                        NavigationBarItem(
+                            selected = currentTab == 1,
+                            onClick = { currentTab = 1 },
+                            icon = { Icon(Icons.Default.PlayCircleFilled, contentDescription = "Streamer") },
+                            label = { Text("Streamer", fontSize = 10.sp, fontWeight = if (currentTab == 1) FontWeight.Bold else FontWeight.Normal) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = StreamerOrange,
+                                selectedTextColor = StreamerOrange,
+                                indicatorColor = StreamerOrange.copy(alpha = 0.15f),
+                                unselectedIconColor = TextTertiary,
+                                unselectedTextColor = TextTertiary
+                            )
+                        )
+                        NavigationBarItem(
+                            selected = currentTab == 2,
+                            onClick = { currentTab = 2 },
+                            icon = { Icon(Icons.Default.Storage, contentDescription = "Storage") },
+                            label = { Text("Storage", fontSize = 10.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Normal) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = AaxionElectricBlue,
+                                selectedTextColor = AaxionElectricBlue,
+                                indicatorColor = AaxionElectricBlue.copy(alpha = 0.15f),
+                                unselectedIconColor = TextTertiary,
+                                unselectedTextColor = TextTertiary
+                            )
+                        )
+                        NavigationBarItem(
+                            selected = currentTab == 3,
+                            onClick = { currentTab = 3 },
+                            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                            label = { Text("Settings", fontSize = 10.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Normal) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = AaxionPrimary,
+                                selectedTextColor = AaxionPrimary,
+                                indicatorColor = AaxionPrimary.copy(alpha = 0.15f),
+                                unselectedIconColor = TextTertiary,
+                                unselectedTextColor = TextTertiary
+                            )
+                        )
+                    }
+                }
+            ) { paddingValues ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+                    when (currentTab) {
+                        0 -> DriveFilesView(
+                            serverUri = serverUri,
+                            token = effectiveToken,
+                            viewModel = viewModel,
+                            isGridView = isGridView,
+                            onToggleView = { isGridView = !isGridView },
+                            isSidebarVisible = isSidebarVisible,
+                            onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
+                            onOpenSettings = { currentTab = 3 },
+                            isTablet = false
+                        )
+                        1 -> StreamerMediaView(
+                            serverUri = serverUri,
+                            token = effectiveToken,
+                            viewModel = viewModel,
+                            isSidebarVisible = isSidebarVisible,
+                            onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
+                            isTablet = false
+                        )
+                        2 -> StorageAndHubView(
+                            serverUri = serverUri,
+                            token = effectiveToken,
+                            masterToken = activeMasterToken,
+                            lastRefreshTs = lastRefreshTs,
+                            isRefreshing = isRefreshingToken,
+                            showStorageDevices = true,
+                            onSelectStorageDevice = { targetPath ->
+                                currentTab = 0
+                                viewModel.navigateTo(serverUri, effectiveToken, targetPath, tokenManager = tokenManager)
+                            },
+                            onRefreshToken = {
+                                scope.launch {
+                                    val success = tokenManager.refreshAccessToken(serverUri)
+                                    val msg = if (success) "Access token refreshed" else "Refresh failed"
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onOpenIpSelector = { showIpSelectorModal = true },
+                            onLogout = onLogout
+                        )
+                        3 -> SettingsScreen(
+                            serverUri = serverUri,
+                            token = effectiveToken,
+                            onBackClick = { currentTab = 0 },
+                            onLogout = onLogout
+                        )
+                    }
+                }
+            }
+        }
                 // Collapsible Sidebar with rounded corners (Overlaid with smooth slide, 0 frame drops)
                 androidx.compose.animation.AnimatedVisibility(
                     visible = isSidebarVisible,
@@ -416,135 +622,6 @@ fun AaxionDriveScreen(
                     }
                 }
 
-            }
-        } else {
-            // ==========================================
-            // MOBILE RESPONSIVE LAYOUT (Full Screen + Bottom Bar)
-            // ==========================================
-            Scaffold(
-                containerColor = Color.Transparent,
-                bottomBar = {
-                    NavigationBar(
-                        containerColor = AaxionSurface,
-                        contentColor = TextPrimary,
-                        tonalElevation = 0.dp,
-                        modifier = Modifier.border(
-                            width = 1.dp,
-                            color = AaxionBorder,
-                            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-                        )
-                    ) {
-                        NavigationBarItem(
-                            selected = currentTab == 0,
-                            onClick = { currentTab = 0 },
-                            icon = { Icon(Icons.Default.CloudQueue, contentDescription = "Drive") },
-                            label = { Text("Drive", fontSize = 10.sp, fontWeight = if (currentTab == 0) FontWeight.Bold else FontWeight.Normal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = AaxionPrimary,
-                                selectedTextColor = AaxionPrimary,
-                                indicatorColor = AaxionPrimary.copy(alpha = 0.15f),
-                                unselectedIconColor = TextTertiary,
-                                unselectedTextColor = TextTertiary
-                            )
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 1,
-                            onClick = { currentTab = 1 },
-                            icon = { Icon(Icons.Default.PlayCircleFilled, contentDescription = "Streamer") },
-                            label = { Text("Streamer", fontSize = 10.sp, fontWeight = if (currentTab == 1) FontWeight.Bold else FontWeight.Normal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = StreamerOrange,
-                                selectedTextColor = StreamerOrange,
-                                indicatorColor = StreamerOrange.copy(alpha = 0.15f),
-                                unselectedIconColor = TextTertiary,
-                                unselectedTextColor = TextTertiary
-                            )
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 2,
-                            onClick = { currentTab = 2 },
-                            icon = { Icon(Icons.Default.Storage, contentDescription = "Storage") },
-                            label = { Text("Storage", fontSize = 10.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Normal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = AaxionElectricBlue,
-                                selectedTextColor = AaxionElectricBlue,
-                                indicatorColor = AaxionElectricBlue.copy(alpha = 0.15f),
-                                unselectedIconColor = TextTertiary,
-                                unselectedTextColor = TextTertiary
-                            )
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 3,
-                            onClick = { currentTab = 3 },
-                            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                            label = { Text("Settings", fontSize = 10.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Normal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = AaxionPrimary,
-                                selectedTextColor = AaxionPrimary,
-                                indicatorColor = AaxionPrimary.copy(alpha = 0.15f),
-                                unselectedIconColor = TextTertiary,
-                                unselectedTextColor = TextTertiary
-                            )
-                        )
-                    }
-                }
-            ) { paddingValues ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
-                    when (currentTab) {
-                        0 -> DriveFilesView(
-                            serverUri = serverUri,
-                            token = effectiveToken,
-                            viewModel = viewModel,
-                            isGridView = isGridView,
-                            onToggleView = { isGridView = !isGridView },
-                            isSidebarVisible = false,
-                            onToggleSidebar = {},
-                            onOpenSettings = { currentTab = 3 },
-                            isTablet = false
-                        )
-                        1 -> StreamerMediaView(
-                            serverUri = serverUri,
-                            token = effectiveToken,
-                            viewModel = viewModel,
-                            isSidebarVisible = false,
-                            onToggleSidebar = {},
-                            isTablet = false
-                        )
-                        2 -> StorageAndHubView(
-                            serverUri = serverUri,
-                            token = effectiveToken,
-                            masterToken = activeMasterToken,
-                            lastRefreshTs = lastRefreshTs,
-                            isRefreshing = isRefreshingToken,
-                            showStorageDevices = true,
-                            onSelectStorageDevice = { targetPath ->
-                                currentTab = 0
-                                viewModel.navigateTo(serverUri, effectiveToken, targetPath, tokenManager = tokenManager)
-                            },
-                            onRefreshToken = {
-                                scope.launch {
-                                    val success = tokenManager.refreshAccessToken(serverUri)
-                                    val msg = if (success) "Access token refreshed" else "Refresh failed"
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            onOpenIpSelector = { showIpSelectorModal = true },
-                            onLogout = onLogout
-                        )
-                        3 -> SettingsScreen(
-                            serverUri = serverUri,
-                            token = effectiveToken,
-                            onBackClick = { currentTab = 0 },
-                            onLogout = onLogout
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -578,6 +655,7 @@ private fun TabletSidebarItem(
             fontSize = 12.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )
+        
     }
 }
 

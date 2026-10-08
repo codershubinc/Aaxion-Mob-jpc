@@ -30,6 +30,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import coil.Coil
+import coil.ImageLoader
+import coil.disk.DiskCache
 import com.codershubinc.aaxion_mob.auth.TokenManager
 import com.codershubinc.aaxion_mob.ui.AaxionDriveScreen
 import com.codershubinc.aaxion_mob.ui.LoginScreen
@@ -45,6 +48,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         hideSystemBars()
+        val imageLoader = ImageLoader.Builder(this)
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(this.cacheDir.resolve("image_cache"))
+                    .maxSizePercent(0.1)
+                    .build()
+            }
+            .crossfade(true)
+            .build()
+        Coil.setImageLoader(imageLoader)
         setContent {
             val context = LocalContext.current
             val dataStoreManager = remember { DataStoreManager(context) }
@@ -71,10 +84,30 @@ class MainActivity : ComponentActivity() {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
             hideSystemBars()
+        val imageLoader = ImageLoader.Builder(this)
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(this.cacheDir.resolve("image_cache"))
+                    .maxSizePercent(0.1)
+                    .build()
+            }
+            .crossfade(true)
+            .build()
+        Coil.setImageLoader(imageLoader)
         }
     }
 
     private fun hideSystemBars() {
+        val imageLoader = ImageLoader.Builder(this)
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(this.cacheDir.resolve("image_cache"))
+                    .maxSizePercent(0.1)
+                    .build()
+            }
+            .crossfade(true)
+            .build()
+        Coil.setImageLoader(imageLoader)
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         insetsController.hide(WindowInsetsCompat.Type.systemBars())
         insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

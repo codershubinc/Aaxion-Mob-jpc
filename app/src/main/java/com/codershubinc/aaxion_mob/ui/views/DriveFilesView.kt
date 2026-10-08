@@ -25,13 +25,17 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.codershubinc.aaxion_mob.ui.FileGridItem
-import com.codershubinc.aaxion_mob.ui.FileListItem
+import com.codershubinc.aaxion_mob.ui.components.files.FileGridItem
+import com.codershubinc.aaxion_mob.ui.components.files.FileListItem
 import com.codershubinc.aaxion_mob.ui.components.InteractiveBreadcrumbs
 import com.codershubinc.aaxion_mob.ui.theme.*
+import com.codershubinc.aaxion_mob.ui.components.search.SearchBar
+import com.codershubinc.aaxion_mob.ui.components.search.FilterChip
 import com.codershubinc.aaxion_mob.utils.IntentUtils
 import com.codershubinc.aaxion_mob.viewmodels.FileCategory
 import com.codershubinc.aaxion_mob.viewmodels.FileViewModel
@@ -53,8 +57,19 @@ fun DriveFilesView(
 ) {
     val context = LocalContext.current
     val tokenManager = androidx.compose.runtime.remember { com.codershubinc.aaxion_mob.auth.TokenManager.getInstance(context) }
+    var selectedImageFile by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<com.codershubinc.aaxion_mob.models.FileItem?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {
+                    focusManager.clearFocus()
+                })
+            }
+    ) {
         // Top Search & Actions Bar (spans full width)
         Surface(
             color = AaxionSurface,
@@ -65,8 +80,8 @@ fun DriveFilesView(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Show sidebar toggle button if on tablet and sidebar is collapsed
-                    if (isTablet && !isSidebarVisible) {
+                    // Show sidebar toggle button if sidebar is collapsed
+                    if (!isSidebarVisible) {
                         IconButton(
                             onClick = onToggleSidebar
                         ) {
@@ -97,41 +112,13 @@ fun DriveFilesView(
                             )
                         }
                     } else {
-                        OutlinedTextField(
-                            value = viewModel.searchQuery,
-                            onValueChange = { viewModel.searchQuery = it },
-                            placeholder = { Text("Search files & folders...", color = TextMuted, fontSize = 13.sp) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = null,
-                                    tint = TextTertiary,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                        SearchBar(
+                            query = viewModel.searchQuery,
+                            onQueryChange = { viewModel.searchQuery = it },
+                            onClear = { 
+                                viewModel.searchQuery = "" 
+                                isSearchExpanded = false 
                             },
-                            trailingIcon = {
-                                if (viewModel.searchQuery.isNotEmpty() || (isMobileLayout && isSearchExpanded)) {
-                                    IconButton(onClick = { 
-                                        viewModel.searchQuery = "" 
-                                        isSearchExpanded = false
-                                    }, modifier = Modifier.minimumInteractiveComponentSize()) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Clear",
-                                            tint = TextSecondary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = AaxionPrimary,
-                                unfocusedBorderColor = AaxionBorder,
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextSecondary
-                            ),
-                            shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.weight(1f).height(48.dp)
                         )
                     }
@@ -221,21 +208,11 @@ fun DriveFilesView(
                     items(FileCategory.values()) { category ->
                         val isSelected = viewModel.selectedCategory == category
 
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelected) AaxionPrimary.copy(alpha = 0.15f) else AaxionCardBg)
-                                .clickable { viewModel.selectedCategory = category }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = category.name.lowercase().replaceFirstChar { it.titlecase(Locale.US) },
-                                color = if (isSelected) AaxionPrimary else TextSecondary,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        }
+                        FilterChip(
+                            label = category.name.lowercase().replaceFirstChar { it.titlecase(Locale.US) },
+                            isSelected = isSelected,
+                            onClick = { viewModel.selectedCategory = category }
+                        )
                     }
                 }
             }
@@ -249,7 +226,7 @@ fun DriveFilesView(
         ) {
             if (viewModel.isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AaxionPrimary, strokeWidth = 2.dp)
+                    com.codershubinc.aaxion_mob.ui.components.CloudLoadingIcon(color = AaxionPrimary)
                 }
             } else if (viewModel.filteredFiles.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -289,6 +266,8 @@ fun DriveFilesView(
                             onClick = {
                                 if (file.isDir) {
                                     viewModel.navigateTo(serverUri, token, file.rawPath, tokenManager = tokenManager)
+                                } else if (file.isImage) {
+                                    selectedImageFile = file
                                 } else if (file.isVideo || file.isAudio) {
                                     val encoded = try {
                                         URLEncoder.encode(file.rawPath, StandardCharsets.UTF_8.toString())
@@ -321,6 +300,8 @@ fun DriveFilesView(
                             onClick = {
                                 if (file.isDir) {
                                     viewModel.navigateTo(serverUri, token, file.rawPath, tokenManager = tokenManager)
+                                } else if (file.isImage) {
+                                    selectedImageFile = file
                                 } else if (file.isVideo || file.isAudio) {
                                     val encoded = try {
                                         URLEncoder.encode(file.rawPath, StandardCharsets.UTF_8.toString())
@@ -336,5 +317,19 @@ fun DriveFilesView(
                 }
             }
         }
+    }
+    selectedImageFile?.let { file ->
+        val encodedPath = try {
+            java.net.URLEncoder.encode(file.rawPath, java.nio.charset.StandardCharsets.UTF_8.toString())
+        } catch (e: Exception) {
+            file.rawPath
+        }
+        val imageUrl = "$serverUri/api/v1/images/view?path=$encodedPath&tkn=$token"
+        
+        com.codershubinc.aaxion_mob.ui.components.ImageViewerModal(
+            file = file,
+            imageUrl = imageUrl,
+            onDismiss = { selectedImageFile = null }
+        )
     }
 }

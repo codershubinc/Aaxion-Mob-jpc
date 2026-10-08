@@ -1,8 +1,11 @@
 package com.codershubinc.aaxion_mob.ui.components
 
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,15 +14,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Usb
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,6 +33,7 @@ data class BreadcrumbSegment(
     val isExternal: Boolean = false
 )
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun InteractiveBreadcrumbs(
     currentPath: String,
@@ -40,6 +42,10 @@ fun InteractiveBreadcrumbs(
     onNavigate: (path: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    var showPathDialog by remember { mutableStateOf(false) }
+    var customPathInput by remember { mutableStateOf("") }
+
     val segments = remember(currentPath) {
         val list = mutableListOf<BreadcrumbSegment>()
         val isExt = currentPath.startsWith("/media") ||
@@ -89,6 +95,13 @@ fun InteractiveBreadcrumbs(
             .clip(RoundedCornerShape(8.dp))
             .background(Color(0xFF070707))
             .border(1.dp, AaxionBorder.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            .combinedClickable(
+                onClick = {},
+                onLongClick = { 
+                    customPathInput = currentPath
+                    showPathDialog = true 
+                }
+            )
             .padding(horizontal = 8.dp, vertical = 5.dp)
     ) {
         // Scrollable crumbs row
@@ -188,5 +201,60 @@ fun InteractiveBreadcrumbs(
                 fontWeight = FontWeight.SemiBold
             )
         }
+    }
+
+    if (showPathDialog) {
+        AlertDialog(
+            onDismissRequest = { showPathDialog = false },
+            title = {
+                Text(
+                    text = "Go to Directory",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                OutlinedTextField(
+                    value = customPathInput,
+                    onValueChange = { customPathInput = it },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accentColor,
+                        unfocusedBorderColor = AaxionBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextSecondary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            containerColor = AaxionSurfaceVariant,
+            confirmButton = {
+                TextButton(onClick = {
+                    showPathDialog = false
+                    var targetPath = customPathInput.trim()
+                    
+                    val lastSlashIdx = targetPath.lastIndexOf('/')
+                    val lastPart = if (lastSlashIdx != -1) targetPath.substring(lastSlashIdx + 1) else targetPath
+                    
+                    if (lastPart.contains(".") && !targetPath.endsWith("/")) {
+                        targetPath = if (lastSlashIdx != -1) targetPath.substring(0, lastSlashIdx) else "/"
+                        if (targetPath.isEmpty()) targetPath = "/"
+                        Toast.makeText(context, "File path detected. Navigating to parent directory...", Toast.LENGTH_SHORT).show()
+                    }
+                    
+                    if (targetPath.isNotBlank()) {
+                        onNavigate(targetPath)
+                    }
+                }) {
+                    Text("GO", color = accentColor, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPathDialog = false }) {
+                    Text("CANCEL", color = TextSecondary)
+                }
+            }
+        )
     }
 }

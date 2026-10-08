@@ -143,10 +143,11 @@ fun AppNavigation() {
     val savedTunnelUri by dataStoreManager.tunnelServerUri.collectAsState(initial = null)
 
     val discoveredServerUris = remember { mutableStateListOf<String>() }
+    val refreshDiscovery = remember { mutableStateOf(0) }
     var discoveredServerUri by remember { mutableStateOf("") }
 
     // Start discovery and load initial tokens
-    DisposableEffect(Unit) {
+    DisposableEffect(refreshDiscovery.value) {
         val discovery = ServerDiscovery(context) { discoveredIp, port ->
             val uri = "http://$discoveredIp:$port"
             discoveredServerUri = uri
@@ -194,7 +195,14 @@ fun AppNavigation() {
     val isLoggedIn = !activeAccessToken.isNullOrBlank() && !activeMasterToken.isNullOrBlank()
     val startDestination = if (isLoggedIn) "drive" else "login"
 
-    NavHost(navController = navController, startDestination = startDestination) {
+    NavHost(
+        navController = navController, 
+        startDestination = startDestination,
+        enterTransition = { androidx.compose.animation.EnterTransition.None },
+        exitTransition = { androidx.compose.animation.ExitTransition.None },
+        popEnterTransition = { androidx.compose.animation.EnterTransition.None },
+        popExitTransition = { androidx.compose.animation.ExitTransition.None }
+    ) {
         composable("login") {
             LoginScreen(
                 serverUri = activeServerUri,
@@ -268,7 +276,11 @@ fun AppNavigation() {
             com.codershubinc.aaxion_mob.ui.ConnectionManagerScreen(
                 discoveredUris = discoveredServerUris.toList(),
                 currentActiveUri = activeServerUri,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onRefresh = {
+                    discoveredServerUris.clear()
+                    refreshDiscovery.value += 1
+                }
             )
         }
     }

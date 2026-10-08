@@ -31,7 +31,8 @@ import kotlinx.coroutines.launch
 fun ConnectionManagerScreen(
     onBackClick: () -> Unit,
     discoveredUris: List<String>,
-    currentActiveUri: String
+    currentActiveUri: String,
+    onRefresh: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -74,6 +75,11 @@ fun ConnectionManagerScreen(
                                 tint = TextPrimary,
                                 modifier = Modifier.size(18.dp)
                             )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onRefresh) {
+                            Icon(imageVector = Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(

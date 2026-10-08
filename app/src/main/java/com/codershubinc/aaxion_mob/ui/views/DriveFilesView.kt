@@ -53,7 +53,9 @@ fun DriveFilesView(
     isSidebarVisible: Boolean,
     onToggleSidebar: () -> Unit,
     onOpenSettings: () -> Unit,
-    isTablet: Boolean
+    isTablet: Boolean,
+    isServerOnline: Boolean?,
+    isLocalConnection: Boolean
 ) {
     val context = LocalContext.current
     val tokenManager = androidx.compose.runtime.remember { com.codershubinc.aaxion_mob.auth.TokenManager.getInstance(context) }
@@ -151,7 +153,17 @@ fun DriveFilesView(
                         )
                     }
 
+
                     if (!isTablet) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = if (isServerOnline == true) Icons.Default.CloudDone else Icons.Default.CloudOff,
+                            contentDescription = "Connection Status",
+                            tint = if (isServerOnline == true) {
+                                if (isLocalConnection) AaxionPrimary else StreamerOrange
+                            } else TextMuted,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
                         IconButton(
                             onClick = onOpenSettings
@@ -164,6 +176,7 @@ fun DriveFilesView(
                             )
                         }
                     }
+
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))

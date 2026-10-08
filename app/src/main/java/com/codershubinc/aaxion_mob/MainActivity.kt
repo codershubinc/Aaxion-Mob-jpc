@@ -116,6 +116,7 @@ fun AppNavigation() {
     val savedAccessToken by dataStoreManager.accessToken.collectAsState(initial = null)
     val savedServerUri by dataStoreManager.serverUri.collectAsState(initial = null)
     val prioritizedServerUri by dataStoreManager.prioritizedServerUri.collectAsState(initial = null)
+    val savedTunnelUri by dataStoreManager.tunnelServerUri.collectAsState(initial = null)
 
     val discoveredServerUris = remember { mutableStateListOf<String>() }
     var discoveredServerUri by remember { mutableStateOf("") }
@@ -184,6 +185,7 @@ fun AppNavigation() {
         composable("drive") {
             AaxionDriveScreen(
                 serverUri = activeServerUri,
+                tunnelUri = savedTunnelUri,
                 token = activeAccessToken ?: "",
                 viewModel = fileViewModel,
                 discoveredUris = discoveredServerUris.toList(),
@@ -202,6 +204,7 @@ fun AppNavigation() {
         composable("me") {
             AaxionDriveScreen(
                 serverUri = activeServerUri,
+                tunnelUri = savedTunnelUri,
                 token = activeAccessToken ?: "",
                 viewModel = fileViewModel,
                 discoveredUris = discoveredServerUris.toList(),
@@ -219,6 +222,7 @@ fun AppNavigation() {
         composable("explorer") {
             AaxionDriveScreen(
                 serverUri = activeServerUri,
+                tunnelUri = savedTunnelUri,
                 token = activeAccessToken ?: "",
                 viewModel = fileViewModel,
                 discoveredUris = discoveredServerUris.toList(),

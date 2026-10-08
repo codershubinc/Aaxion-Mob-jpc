@@ -79,6 +79,7 @@ import java.util.Locale
 @Composable
 fun AaxionDriveScreen(
     serverUri: String,
+    tunnelUri: String? = null,
     token: String,
     viewModel: FileViewModel,
     discoveredUris: List<String> = emptyList(),
@@ -143,52 +144,66 @@ fun AaxionDriveScreen(
     // Live server ping and latency
     var serverLatencyMs by remember { mutableStateOf<Long?>(null) }
     var isServerOnline by remember { mutableStateOf<Boolean?>(null) }
+    var isLocalConnection by remember { mutableStateOf(true) }
+    var activeServerUri by remember(serverUri) { mutableStateOf(serverUri) }
 
-    LaunchedEffect(serverUri) {
-        if (serverUri.isNotBlank()) {
-            while (isActive) {
-                try {
-                    val client = Fetcher.getInstance().getClient()
-                    val pingUrl = if (serverUri.endsWith("/")) "${serverUri}api/v1/system/storage" else "$serverUri/api/v1/system/storage"
-                    val request = okhttp3.Request.Builder()
-                        .url(pingUrl)
-                        .head()
-                        .build()
-
+    LaunchedEffect(serverUri, tunnelUri) {
+        while (isActive) {
+            val client = Fetcher.getInstance().getClient()
+            
+            suspend fun ping(uri: String): Long? {
+                if (uri.isBlank()) return null
+                val cleanUri = if (uri.endsWith("/")) uri.dropLast(1) else uri
+                val pingUrl = "$cleanUri/api/v1/system/storage"
+                return try {
+                    val request = okhttp3.Request.Builder().url(pingUrl).head().build()
                     val startTime = System.currentTimeMillis()
                     val response = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                        try {
-                            client.newCall(request).execute()
-                        } catch (e: Exception) {
-                            null
-                        }
+                        try { client.newCall(request).execute() } catch (e: Exception) { null }
                     }
                     val elapsed = System.currentTimeMillis() - startTime
                     if (response != null && (response.isSuccessful || response.code in 200..499)) {
                         response.close()
-                        serverLatencyMs = elapsed
-                        isServerOnline = true
-                    } else {
-                        serverLatencyMs = null
-                        isServerOnline = false
-                    }
-                } catch (e: Exception) {
-                    serverLatencyMs = null
-                    isServerOnline = false
-                }
-                delay(8000L) // Ping every 8 seconds
+                        elapsed
+                    } else null
+                } catch (e: Exception) { null }
             }
-        } else {
-            isServerOnline = false
-            serverLatencyMs = null
+
+            if (serverUri.isNotBlank()) {
+                val localLat = ping(serverUri)
+                if (localLat != null) {
+                    isServerOnline = true
+                    isLocalConnection = true
+                    serverLatencyMs = localLat
+                    activeServerUri = serverUri
+                } else if (!tunnelUri.isNullOrBlank()) {
+                    val tunnelLat = ping(tunnelUri!!)
+                    if (tunnelLat != null) {
+                        isServerOnline = true
+                        isLocalConnection = false
+                        serverLatencyMs = tunnelLat
+                        activeServerUri = tunnelUri!!
+                    } else {
+                        isServerOnline = false
+                        serverLatencyMs = null
+                    }
+                } else {
+                    isServerOnline = false
+                    serverLatencyMs = null
+                }
+            } else {
+                isServerOnline = false
+                serverLatencyMs = null
+            }
+            delay(8000L)
         }
     }
 
     // Initial load
-    LaunchedEffect(serverUri, effectiveToken) {
-        if (serverUri.isNotBlank() && effectiveToken.isNotBlank()) {
+    LaunchedEffect(activeServerUri, effectiveToken) {
+        if (activeServerUri.isNotBlank() && effectiveToken.isNotBlank()) {
             if (viewModel.files.isEmpty()) {
-                viewModel.fetchFiles(serverUri, effectiveToken, "/", tokenManager = tokenManager)
+                viewModel.fetchFiles(activeServerUri, effectiveToken, "/", tokenManager = tokenManager)
             }
         }
     }
@@ -211,7 +226,7 @@ fun AaxionDriveScreen(
                 ) {
                     when (currentTab) {
                         0 -> DriveFilesView(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
                             isGridView = isGridView,
@@ -219,10 +234,12 @@ fun AaxionDriveScreen(
                             isSidebarVisible = isSidebarVisible,
                             onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
                             onOpenSettings = { currentTab = 3 },
-                            isTablet = true
+                            isTablet = true,
+                            isServerOnline = isServerOnline,
+                            isLocalConnection = isLocalConnection
                         )
                         1 -> StreamerMediaView(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
                             isSidebarVisible = isSidebarVisible,
@@ -230,7 +247,7 @@ fun AaxionDriveScreen(
                             isTablet = true
                         )
                         2 -> StorageAndHubView(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             masterToken = activeMasterToken,
                             lastRefreshTs = lastRefreshTs,
@@ -246,7 +263,7 @@ fun AaxionDriveScreen(
                             onLogout = onLogout
                         )
                         3 -> SettingsScreen(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             onBackClick = { currentTab = 0 },
                             onLogout = onLogout
@@ -262,10 +279,10 @@ fun AaxionDriveScreen(
     }
 
     // Initial load
-    LaunchedEffect(serverUri, effectiveToken) {
-        if (serverUri.isNotBlank() && effectiveToken.isNotBlank()) {
+    LaunchedEffect(activeServerUri, effectiveToken) {
+        if (activeServerUri.isNotBlank() && effectiveToken.isNotBlank()) {
             if (viewModel.files.isEmpty()) {
-                viewModel.fetchFiles(serverUri, effectiveToken, "/", tokenManager = tokenManager)
+                viewModel.fetchFiles(activeServerUri, effectiveToken, "/", tokenManager = tokenManager)
             }
         }
     }
@@ -288,7 +305,7 @@ fun AaxionDriveScreen(
                 ) {
                     when (currentTab) {
                         0 -> DriveFilesView(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
                             isGridView = isGridView,
@@ -296,10 +313,12 @@ fun AaxionDriveScreen(
                             isSidebarVisible = isSidebarVisible,
                             onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
                             onOpenSettings = { currentTab = 3 },
-                            isTablet = true
+                            isTablet = true,
+                            isServerOnline = isServerOnline,
+                            isLocalConnection = isLocalConnection
                         )
                         1 -> StreamerMediaView(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
                             isSidebarVisible = isSidebarVisible,
@@ -307,7 +326,7 @@ fun AaxionDriveScreen(
                             isTablet = true
                         )
                         2 -> StorageAndHubView(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             masterToken = activeMasterToken,
                             lastRefreshTs = lastRefreshTs,
@@ -323,7 +342,7 @@ fun AaxionDriveScreen(
                             onLogout = onLogout
                         )
                         3 -> SettingsScreen(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             onBackClick = { currentTab = 0 },
                             onLogout = onLogout
@@ -411,7 +430,7 @@ fun AaxionDriveScreen(
                 ) {
                     when (currentTab) {
                         0 -> DriveFilesView(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
                             isGridView = isGridView,
@@ -419,10 +438,12 @@ fun AaxionDriveScreen(
                             isSidebarVisible = isSidebarVisible,
                             onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
                             onOpenSettings = { currentTab = 3 },
-                            isTablet = false
+                            isTablet = false,
+                            isServerOnline = isServerOnline,
+                            isLocalConnection = isLocalConnection
                         )
                         1 -> StreamerMediaView(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
                             isSidebarVisible = isSidebarVisible,
@@ -430,7 +451,7 @@ fun AaxionDriveScreen(
                             isTablet = false
                         )
                         2 -> StorageAndHubView(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             masterToken = activeMasterToken,
                             lastRefreshTs = lastRefreshTs,
@@ -451,7 +472,7 @@ fun AaxionDriveScreen(
                             onLogout = onLogout
                         )
                         3 -> SettingsScreen(
-                            serverUri = serverUri,
+                            serverUri = activeServerUri,
                             token = effectiveToken,
                             onBackClick = { currentTab = 0 },
                             onLogout = onLogout
@@ -600,7 +621,7 @@ fun AaxionDriveScreen(
 
                             // Storage Device Tiles directly at bottom of sidebar!
                             SidebarStorageDevices(
-                                serverUri = serverUri,
+                                serverUri = activeServerUri,
                                 token = effectiveToken,
                                 onSelectStorageDevice = { targetPath ->
                                     currentTab = 0

@@ -25,6 +25,7 @@ class DataStoreManager(private val context: Context) {
         val ACCENT_THEME_KEY = stringPreferencesKey("accent_theme")
         val ICON_PACK_KEY = stringPreferencesKey("icon_pack_theme")
         val PRIORITIZED_SERVER_URI_KEY = stringPreferencesKey("prioritized_server_uri")
+        val TUNNEL_SERVER_URI_KEY = stringPreferencesKey("tunnel_server_uri")
     }
 
     suspend fun setPrioritizedServerUri(uri: String?) {
@@ -111,6 +112,20 @@ class DataStoreManager(private val context: Context) {
             preferences[SERVER_URI_KEY] = "http://$ip:$port"
         }
     }
+
+
+    suspend fun setTunnelServerUri(uri: String?) {
+        context.dataStore.edit { preferences ->
+            if (uri.isNullOrBlank()) {
+                preferences.remove(TUNNEL_SERVER_URI_KEY)
+            } else {
+                preferences[TUNNEL_SERVER_URI_KEY] = uri
+            }
+        }
+    }
+
+    val tunnelServerUri: Flow<String?> = context.dataStore.data
+        .map { preferences -> preferences[TUNNEL_SERVER_URI_KEY] }
 
     suspend fun clearAll() {
         context.dataStore.edit { preferences ->

@@ -59,6 +59,11 @@ fun SettingsScreen(
         com.codershubinc.aaxion_mob.models.IconPackTheme.fromId(savedIconPackId)
     }
 
+
+    val savedTunnelUri by dataStoreManager.tunnelServerUri.collectAsState(initial = "")
+    var tunnelUriInput by remember(savedTunnelUri) { mutableStateOf(savedTunnelUri ?: "") }
+    var isEditingTunnel by remember { mutableStateOf(false) }
+
     val isRefreshingToken by tokenManager.isRefreshing.collectAsState()
     val lastRefreshTs by tokenManager.lastRefreshTimestamp.collectAsState()
     val activeMasterToken by tokenManager.masterTokenState.collectAsState()

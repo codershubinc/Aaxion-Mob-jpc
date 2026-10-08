@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        hideSystemBars()
+        updateSystemBars()
         val imageLoader = ImageLoader.Builder(this)
             .diskCache {
                 DiskCache.Builder()
@@ -83,34 +83,22 @@ class MainActivity : ComponentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
-            hideSystemBars()
-        val imageLoader = ImageLoader.Builder(this)
-            .diskCache {
-                DiskCache.Builder()
-                    .directory(this.cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.1)
-                    .build()
-            }
-            .crossfade(true)
-            .build()
-        Coil.setImageLoader(imageLoader)
+            updateSystemBars()
         }
     }
 
-    private fun hideSystemBars() {
-        val imageLoader = ImageLoader.Builder(this)
-            .diskCache {
-                DiskCache.Builder()
-                    .directory(this.cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.1)
-                    .build()
-            }
-            .crossfade(true)
-            .build()
-        Coil.setImageLoader(imageLoader)
+    private fun updateSystemBars() {
+        val configuration = resources.configuration
+        val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val isTablet = configuration.smallestScreenWidthDp >= 600
+
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        insetsController.hide(WindowInsetsCompat.Type.systemBars())
-        insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (isLandscape || isTablet) {
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
+            insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
+        }
     }
 }
 

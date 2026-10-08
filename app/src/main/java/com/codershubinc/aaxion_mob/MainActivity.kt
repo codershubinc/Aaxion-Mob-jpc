@@ -97,26 +97,22 @@ class MainActivity : ComponentActivity() {
             val hideStatusBar = dataStoreManager.hideStatusBar.first()
             val hideNavBar = dataStoreManager.hideNavigationBar.first()
 
-            val configuration = resources.configuration
-            val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            val isTablet = configuration.smallestScreenWidthDp >= 600
-
             val insetsController = WindowCompat.getInsetsController(window, window.decorView)
             insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
             var hideTypes = 0
-            if (isLandscape || isTablet || hideStatusBar) {
+            if (hideStatusBar) {
                 hideTypes = hideTypes or WindowInsetsCompat.Type.statusBars()
             }
-            if (isLandscape || isTablet || hideNavBar) {
+            if (hideNavBar) {
                 hideTypes = hideTypes or WindowInsetsCompat.Type.navigationBars()
             }
 
             var showTypes = 0
-            if (!isLandscape && !isTablet && !hideStatusBar) {
+            if (!hideStatusBar) {
                 showTypes = showTypes or WindowInsetsCompat.Type.statusBars()
             }
-            if (!isLandscape && !isTablet && !hideNavBar) {
+            if (!hideNavBar) {
                 showTypes = showTypes or WindowInsetsCompat.Type.navigationBars()
             }
 

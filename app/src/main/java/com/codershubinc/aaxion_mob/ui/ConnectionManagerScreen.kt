@@ -25,6 +25,11 @@ import com.codershubinc.aaxion_mob.ui.components.AaxionCard
 import com.codershubinc.aaxion_mob.ui.theme.*
 import com.codershubinc.aaxion_mob.utils.DataStoreManager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.codershubinc.aaxion_mob.utils.Fetcher
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +47,36 @@ fun ConnectionManagerScreen(
     val savedTunnelUri by dataStoreManager.tunnelServerUri.collectAsState(initial = "")
     
     var showCustomIpDialog by remember { mutableStateOf(false) }
+
+    val latencyMap = remember { mutableStateMapOf<String, Long?>() }
+
+    LaunchedEffect(prioritizedServerUris, discoveredUris, savedTunnelUri) {
+        while (isActive) {
+            val client = Fetcher.getInstance().getClient()
+            val urisToPing = prioritizedServerUris + discoveredUris + listOfNotNull(savedTunnelUri.takeIf { !it.isNullOrBlank() })
+            for (uri in urisToPing) {
+                if (uri.isBlank()) continue
+                val cleanUri = if (uri.endsWith("/")) uri.dropLast(1) else uri
+                val pingUrl = "$cleanUri/api/v1/system/storage"
+                try {
+                    val request = okhttp3.Request.Builder().url(pingUrl).head().build()
+                    val startTime = System.currentTimeMillis()
+                    val response = withContext(Dispatchers.IO) {
+                        try { client.newCall(request).execute() } catch (e: Exception) { null }
+                    }
+                    if (response != null && response.isSuccessful) {
+                        latencyMap[uri] = System.currentTimeMillis() - startTime
+                    } else {
+                        latencyMap[uri] = null
+                    }
+                    response?.close()
+                } catch (e: Exception) {
+                    latencyMap[uri] = null
+                }
+            }
+            delay(3000)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -190,6 +225,15 @@ fun ConnectionManagerScreen(
                                             fontWeight = FontWeight.Medium,
                                             maxLines = 1
                                         )
+                                        if (!savedTunnelUri.isNullOrBlank()) {
+                                            val lat = latencyMap[savedTunnelUri]
+                                            Text(
+                                                text = if (lat != null) "$lat ms" else "Offline",
+                                                color = if (lat != null) Color(0xFF10B981) else TextMuted,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
                                     IconButton(onClick = { isEditingTunnel = true }) {
                                         Icon(Icons.Default.Edit, contentDescription = "Edit Tunnel URL", tint = AaxionPrimary)
@@ -266,16 +310,25 @@ fun ConnectionManagerScreen(
                                             .background(if (isActive) Color(0xFF10B981) else TextTertiary)
                                     )
                                     Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = run {
-                                            val u = android.net.Uri.parse(uri)
-                                            val host = u.host ?: uri
-                                            if (u.port != -1) "${host}:${u.port}" else host
-                                        },
-                                        color = if (isActive) TextPrimary else TextSecondary,
-                                        fontSize = 15.sp,
-                                        fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
-                                    )
+                                    Column {
+                                        Text(
+                                            text = run {
+                                                val u = android.net.Uri.parse(uri)
+                                                val host = u.host ?: uri
+                                                if (u.port != -1) "${host}:${u.port}" else host
+                                            },
+                                            color = if (isActive) TextPrimary else TextSecondary,
+                                            fontSize = 15.sp,
+                                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
+                                        )
+                                        val lat = latencyMap[uri]
+                                        Text(
+                                            text = if (lat != null) "$lat ms" else "Offline",
+                                            color = if (lat != null) Color(0xFF10B981) else TextMuted,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
 
                                 if (isPrioritized) {

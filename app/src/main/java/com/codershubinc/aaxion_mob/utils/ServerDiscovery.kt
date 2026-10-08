@@ -28,8 +28,16 @@ class ServerDiscovery(context: Context, private val onServerFound: (ip: String, 
                     override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
                         Log.d("ServerDiscovery", "Resolve Succeeded. $serviceInfo")
                         val port = serviceInfo.port
-                        val host = serviceInfo.host.hostAddress
+                        var host = serviceInfo.host.hostAddress
                         if (host != null) {
+                            // Strip scope id if present (e.g. %wlan0)
+                            if (host.contains("%")) {
+                                host = host.substringBefore("%")
+                            }
+                            // Enclose IPv6 address in brackets for URL compatibility
+                            if (host.contains(":")) {
+                                host = "[$host]"
+                            }
                             onServerFound(host, port)
                         }
                     }

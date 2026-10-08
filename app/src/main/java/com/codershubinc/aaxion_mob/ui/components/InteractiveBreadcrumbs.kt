@@ -237,7 +237,13 @@ fun InteractiveBreadcrumbs(
                     val lastSlashIdx = targetPath.lastIndexOf('/')
                     val lastPart = if (lastSlashIdx != -1) targetPath.substring(lastSlashIdx + 1) else targetPath
                     
-                    if (lastPart.contains(".") && !targetPath.endsWith("/")) {
+                    val dotIndex = lastPart.lastIndexOf('.')
+                    val hasValidExtension = if (dotIndex > 0 && dotIndex < lastPart.length - 1) {
+                        val ext = lastPart.substring(dotIndex + 1)
+                        ext.length in 1..5 && ext.all { it.isLetterOrDigit() }
+                    } else false
+
+                    if (hasValidExtension && !targetPath.endsWith("/")) {
                         targetPath = if (lastSlashIdx != -1) targetPath.substring(0, lastSlashIdx) else "/"
                         if (targetPath.isEmpty()) targetPath = "/"
                         Toast.makeText(context, "File path detected. Navigating to parent directory...", Toast.LENGTH_SHORT).show()

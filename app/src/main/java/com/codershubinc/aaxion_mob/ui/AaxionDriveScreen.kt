@@ -57,7 +57,7 @@ import com.codershubinc.aaxion_mob.models.FileItem
 import com.codershubinc.aaxion_mob.models.StorageInfoResponse
 import com.codershubinc.aaxion_mob.ui.components.AaxionCard
 import com.codershubinc.aaxion_mob.ui.components.InteractiveBreadcrumbs
-import com.codershubinc.aaxion_mob.ui.components.IpSelectorModal
+
 import com.codershubinc.aaxion_mob.ui.components.StorageInfoTile
 import com.codershubinc.aaxion_mob.ui.theme.*
 import com.codershubinc.aaxion_mob.ui.views.DriveFilesView
@@ -83,7 +83,8 @@ fun AaxionDriveScreen(
     token: String,
     viewModel: FileViewModel,
     discoveredUris: List<String> = emptyList(),
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigateToConnectionManager: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -94,8 +95,7 @@ fun AaxionDriveScreen(
     val isTablet = !isMobile && !isDesktop
 
     val dataStoreManager = remember { DataStoreManager(context) }
-    val prioritizedServerUri by dataStoreManager.prioritizedServerUri.collectAsState(initial = null)
-    var showIpSelectorModal by remember { mutableStateOf(false) }
+    val prioritizedServerUris by dataStoreManager.prioritizedServerUris.collectAsState(initial = emptyList())
 
     val tokenManager = remember { TokenManager.getInstance(context) }
     val isRefreshingToken by tokenManager.isRefreshing.collectAsState()
@@ -119,35 +119,13 @@ fun AaxionDriveScreen(
         }
     }
 
-    // Modal for selecting and prioritizing server IP
-    if (showIpSelectorModal) {
-        IpSelectorModal(
-            currentActiveUri = serverUri,
-            prioritizedUri = prioritizedServerUri,
-            discoveredUris = discoveredUris,
-            onSelectAndPrioritize = { selectedUri ->
-                scope.launch {
-                    dataStoreManager.setPrioritizedServerUri(selectedUri)
-                    showIpSelectorModal = false
-                }
-            },
-            onClearPriority = {
-                scope.launch {
-                    dataStoreManager.setPrioritizedServerUri(null)
-                    showIpSelectorModal = false
-                }
-            },
-            onDismiss = { showIpSelectorModal = false }
-        )
-    }
-
     // Live server ping and latency
     var serverLatencyMs by remember { mutableStateOf<Long?>(null) }
     var isServerOnline by remember { mutableStateOf<Boolean?>(null) }
     var isLocalConnection by remember { mutableStateOf(true) }
     var activeServerUri by remember(serverUri) { mutableStateOf(serverUri) }
 
-    LaunchedEffect(serverUri, tunnelUri) {
+    LaunchedEffect(prioritizedServerUris, discoveredUris, tunnelUri) {
         while (isActive) {
             val client = Fetcher.getInstance().getClient()
             
@@ -169,32 +147,53 @@ fun AaxionDriveScreen(
                 } catch (e: Exception) { null }
             }
 
-            if (serverUri.isNotBlank()) {
-                val localLat = ping(serverUri)
-                if (localLat != null) {
+            var found = false
+            // 1. Try Prioritized URIs in order
+            for (uri in prioritizedServerUris) {
+                val lat = ping(uri)
+                if (lat != null) {
                     isServerOnline = true
                     isLocalConnection = true
-                    serverLatencyMs = localLat
-                    activeServerUri = serverUri
-                } else if (!tunnelUri.isNullOrBlank()) {
-                    val tunnelLat = ping(tunnelUri!!)
-                    if (tunnelLat != null) {
-                        isServerOnline = true
-                        isLocalConnection = false
-                        serverLatencyMs = tunnelLat
-                        activeServerUri = tunnelUri!!
-                    } else {
-                        isServerOnline = false
-                        serverLatencyMs = null
-                    }
-                } else {
-                    isServerOnline = false
-                    serverLatencyMs = null
+                    serverLatencyMs = lat
+                    activeServerUri = uri
+                    found = true
+                    break
                 }
-            } else {
+            }
+
+            // 2. Try Discovered URIs
+            if (!found) {
+                val remainingUris = discoveredUris.filter { !prioritizedServerUris.contains(it) }
+                for (uri in remainingUris) {
+                    val lat = ping(uri)
+                    if (lat != null) {
+                        isServerOnline = true
+                        isLocalConnection = true
+                        serverLatencyMs = lat
+                        activeServerUri = uri
+                        found = true
+                        break
+                    }
+                }
+            }
+
+            // 3. Try Tunnel URI
+            if (!found && !tunnelUri.isNullOrBlank()) {
+                val lat = ping(tunnelUri!!)
+                if (lat != null) {
+                    isServerOnline = true
+                    isLocalConnection = false
+                    serverLatencyMs = lat
+                    activeServerUri = tunnelUri!!
+                    found = true
+                }
+            }
+
+            if (!found) {
                 isServerOnline = false
                 serverLatencyMs = null
             }
+
             delay(8000L)
         }
     }
@@ -259,14 +258,15 @@ fun AaxionDriveScreen(
                                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            onOpenIpSelector = { showIpSelectorModal = true },
+                            onOpenIpSelector = onNavigateToConnectionManager,
                             onLogout = onLogout
                         )
                         3 -> SettingsScreen(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             onBackClick = { currentTab = 0 },
-                            onLogout = onLogout
+                            onLogout = onLogout,
+                            onNavigateToConnectionManager = onNavigateToConnectionManager
                         )
                     }
                 }
@@ -338,14 +338,15 @@ fun AaxionDriveScreen(
                                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            onOpenIpSelector = { showIpSelectorModal = true },
+                            onOpenIpSelector = onNavigateToConnectionManager,
                             onLogout = onLogout
                         )
                         3 -> SettingsScreen(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             onBackClick = { currentTab = 0 },
-                            onLogout = onLogout
+                            onLogout = onLogout,
+                            onNavigateToConnectionManager = onNavigateToConnectionManager
                         )
                     }
                 }
@@ -468,14 +469,15 @@ fun AaxionDriveScreen(
                                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            onOpenIpSelector = { showIpSelectorModal = true },
+                            onOpenIpSelector = onNavigateToConnectionManager,
                             onLogout = onLogout
                         )
                         3 -> SettingsScreen(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             onBackClick = { currentTab = 0 },
-                            onLogout = onLogout
+                            onLogout = onLogout,
+                            onNavigateToConnectionManager = onNavigateToConnectionManager
                         )
                     }
                 }
@@ -541,7 +543,7 @@ fun AaxionDriveScreen(
                                     Column(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
-                                            .clickable { showIpSelectorModal = true }
+                                            .clickable { onNavigateToConnectionManager() }
                                             .padding(horizontal = 4.dp, vertical = 2.dp)
                                     ) {
                                         Text(
@@ -571,7 +573,7 @@ fun AaxionDriveScreen(
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
-                                            if (!prioritizedServerUri.isNullOrBlank()) {
+                                            if (prioritizedServerUris.contains(activeServerUri)) {
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Icon(
                                                     imageVector = Icons.Default.Star,

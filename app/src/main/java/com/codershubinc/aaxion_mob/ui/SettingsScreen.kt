@@ -42,7 +42,8 @@ fun SettingsScreen(
     serverUri: String,
     token: String,
     onBackClick: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigateToConnectionManager: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -51,6 +52,8 @@ fun SettingsScreen(
 
     val savedAccentId by dataStoreManager.accentTheme.collectAsState(initial = null)
     val savedIconPackId by dataStoreManager.iconPackTheme.collectAsState(initial = null)
+    val hideStatusBar by dataStoreManager.hideStatusBar.collectAsState(initial = false)
+    val hideNavBar by dataStoreManager.hideNavigationBar.collectAsState(initial = false)
 
     val currentAccent = remember(savedAccentId) {
         com.codershubinc.aaxion_mob.models.AccentTheme.fromId(savedAccentId)
@@ -439,76 +442,100 @@ fun SettingsScreen(
 
                 // SECTION: Sign Out
 
-                // SECTION: Remote Connection (Tunnel)
-                SettingsSectionHeader("REMOTE CONNECTION (TUNNEL)")
-                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Configure a backup/remote tunnel URL (e.g., Cloudflare Tunnel) to access your server when outside the local network.",
-                            color = TextSecondary,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-                        
-                        if (isEditingTunnel) {
-                            OutlinedTextField(
-                                value = tunnelUriInput,
-                                onValueChange = { tunnelUriInput = it },
-                                label = { Text("Tunnel URL (http/https)") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = AaxionPrimary,
-                                    unfocusedBorderColor = AaxionBorder,
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary
-                                )
+                // SECTION: Server Connections
+                SettingsSectionHeader("SERVER CONNECTIONS")
+                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder, onClick = onNavigateToConnectionManager) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Connection Manager",
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                                TextButton(onClick = { 
-                                    isEditingTunnel = false
-                                    tunnelUriInput = savedTunnelUri ?: ""
-                                }) {
-                                    Text("Cancel", color = TextSecondary)
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Button(
-                                    onClick = { 
-                                        scope.launch { 
-                                            dataStoreManager.setTunnelServerUri(tunnelUriInput)
-                                            isEditingTunnel = false
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = AaxionPrimary)
-                                ) {
-                                    Text("Save")
-                                }
-                            }
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = if (savedTunnelUri.isNullOrBlank()) "No Tunnel Configured" else savedTunnelUri!!,
-                                        color = if (savedTunnelUri.isNullOrBlank()) TextMuted else TextPrimary,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1
-                                    )
-                                }
-                                IconButton(onClick = { isEditingTunnel = true }) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Edit Tunnel URL", tint = AaxionPrimary)
-                                }
-                            }
+                            Text(
+                                text = "Manage pinned local IP and remote Tunnel URL",
+                                color = TextTertiary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
                         }
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = "Open Connection Manager",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                 }
 
                 // SECTION: Storage & Cache
+                SettingsSectionHeader("DISPLAY SETTINGS")
+                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Hide Status Bar",
+                                    color = TextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "Hide notification bar by default",
+                                    color = TextTertiary,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                            Switch(
+                                checked = hideStatusBar,
+                                onCheckedChange = { 
+                                    scope.launch { dataStoreManager.setHideStatusBar(it) }
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = Color(currentAccent.colorHex), checkedTrackColor = Color(currentAccent.colorHex).copy(alpha = 0.5f))
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp).fillMaxWidth().background(Color.Transparent))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Hide Navigation Bar",
+                                    color = TextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "Hide system navigation bar by default",
+                                    color = TextTertiary,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                            Switch(
+                                checked = hideNavBar,
+                                onCheckedChange = { 
+                                    scope.launch { dataStoreManager.setHideNavigationBar(it) }
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = Color(currentAccent.colorHex), checkedTrackColor = Color(currentAccent.colorHex).copy(alpha = 0.5f))
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
                 SettingsSectionHeader("STORAGE & CACHE")
                 var cacheSizeString by remember { mutableStateOf("Calculating...") }
                 LaunchedEffect(Unit) {

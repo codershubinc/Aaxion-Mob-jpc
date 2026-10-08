@@ -42,6 +42,9 @@ import com.codershubinc.aaxion_mob.utils.DataStoreManager
 import com.codershubinc.aaxion_mob.utils.ServerDiscovery
 import com.codershubinc.aaxion_mob.viewmodels.FileViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.combine
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,16 +91,41 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateSystemBars() {
-        val configuration = resources.configuration
-        val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val isTablet = configuration.smallestScreenWidthDp >= 600
+        lifecycleScope.launch {
+            val context = this@MainActivity
+            val dataStoreManager = DataStoreManager(context)
+            val hideStatusBar = dataStoreManager.hideStatusBar.first()
+            val hideNavBar = dataStoreManager.hideNavigationBar.first()
 
-        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        if (isLandscape || isTablet) {
-            insetsController.hide(WindowInsetsCompat.Type.systemBars())
+            val configuration = resources.configuration
+            val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val isTablet = configuration.smallestScreenWidthDp >= 600
+
+            val insetsController = WindowCompat.getInsetsController(window, window.decorView)
             insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        } else {
-            insetsController.show(WindowInsetsCompat.Type.systemBars())
+
+            var hideTypes = 0
+            if (isLandscape || isTablet || hideStatusBar) {
+                hideTypes = hideTypes or WindowInsetsCompat.Type.statusBars()
+            }
+            if (isLandscape || isTablet || hideNavBar) {
+                hideTypes = hideTypes or WindowInsetsCompat.Type.navigationBars()
+            }
+
+            var showTypes = 0
+            if (!isLandscape && !isTablet && !hideStatusBar) {
+                showTypes = showTypes or WindowInsetsCompat.Type.statusBars()
+            }
+            if (!isLandscape && !isTablet && !hideNavBar) {
+                showTypes = showTypes or WindowInsetsCompat.Type.navigationBars()
+            }
+
+            if (hideTypes != 0) {
+                insetsController.hide(hideTypes)
+            }
+            if (showTypes != 0) {
+                insetsController.show(showTypes)
+            }
         }
     }
 }
@@ -115,7 +143,7 @@ fun AppNavigation() {
     val savedMasterToken by dataStoreManager.masterToken.collectAsState(initial = null)
     val savedAccessToken by dataStoreManager.accessToken.collectAsState(initial = null)
     val savedServerUri by dataStoreManager.serverUri.collectAsState(initial = null)
-    val prioritizedServerUri by dataStoreManager.prioritizedServerUri.collectAsState(initial = null)
+    val prioritizedServerUris by dataStoreManager.prioritizedServerUris.collectAsState(initial = emptyList())
     val savedTunnelUri by dataStoreManager.tunnelServerUri.collectAsState(initial = null)
 
     val discoveredServerUris = remember { mutableStateListOf<String>() }
@@ -141,9 +169,9 @@ fun AppNavigation() {
         }
     }
 
-    val activeServerUri = remember(prioritizedServerUri, discoveredServerUri, savedServerUri) {
+    val activeServerUri = remember(prioritizedServerUris, discoveredServerUri, savedServerUri) {
         when {
-            !prioritizedServerUri.isNullOrBlank() -> prioritizedServerUri!!
+            prioritizedServerUris.isNotEmpty() -> prioritizedServerUris.first()
             discoveredServerUri.isNotBlank() -> discoveredServerUri
             !savedServerUri.isNullOrBlank() -> savedServerUri!!
             else -> ""
@@ -196,7 +224,8 @@ fun AppNavigation() {
                             popUpTo("drive") { inclusive = true }
                         }
                     }
-                }
+                },
+                onNavigateToConnectionManager = { navController.navigate("connection_manager") }
             )
         }
 
@@ -215,7 +244,8 @@ fun AppNavigation() {
                             popUpTo("me") { inclusive = true }
                         }
                     }
-                }
+                },
+                onNavigateToConnectionManager = { navController.navigate("connection_manager") }
             )
         }
 
@@ -233,7 +263,16 @@ fun AppNavigation() {
                             popUpTo("explorer") { inclusive = true }
                         }
                     }
-                }
+                },
+                onNavigateToConnectionManager = { navController.navigate("connection_manager") }
+            )
+        }
+
+        composable("connection_manager") {
+            com.codershubinc.aaxion_mob.ui.ConnectionManagerScreen(
+                discoveredUris = discoveredServerUris.toList(),
+                currentActiveUri = activeServerUri,
+                onBackClick = { navController.popBackStack() }
             )
         }
     }

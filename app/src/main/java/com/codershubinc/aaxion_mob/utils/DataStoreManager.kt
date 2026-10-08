@@ -24,23 +24,28 @@ class DataStoreManager(private val context: Context) {
         val DEVICE_NAME_KEY = stringPreferencesKey("device_name")
         val ACCENT_THEME_KEY = stringPreferencesKey("accent_theme")
         val ICON_PACK_KEY = stringPreferencesKey("icon_pack_theme")
-        val PRIORITIZED_SERVER_URI_KEY = stringPreferencesKey("prioritized_server_uri")
+        val PRIORITIZED_SERVER_URIS_KEY = stringPreferencesKey("prioritized_server_uris")
         val TUNNEL_SERVER_URI_KEY = stringPreferencesKey("tunnel_server_uri")
+        val HIDE_STATUS_BAR_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("hide_status_bar")
+        val HIDE_NAVIGATION_BAR_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("hide_navigation_bar")
     }
 
-    suspend fun setPrioritizedServerUri(uri: String?) {
+    suspend fun setPrioritizedServerUris(uris: List<String>) {
         context.dataStore.edit { preferences ->
-            if (uri.isNullOrBlank()) {
-                preferences.remove(PRIORITIZED_SERVER_URI_KEY)
+            if (uris.isEmpty()) {
+                preferences.remove(PRIORITIZED_SERVER_URIS_KEY)
             } else {
-                preferences[PRIORITIZED_SERVER_URI_KEY] = uri
-                preferences[SERVER_URI_KEY] = uri
+                val csv = uris.joinToString(",")
+                preferences[PRIORITIZED_SERVER_URIS_KEY] = csv
+                preferences[SERVER_URI_KEY] = uris.first()
             }
         }
     }
 
-    val prioritizedServerUri: Flow<String?> = context.dataStore.data
-        .map { preferences -> preferences[PRIORITIZED_SERVER_URI_KEY] }
+    val prioritizedServerUris: Flow<List<String>> = context.dataStore.data
+        .map { preferences -> 
+            preferences[PRIORITIZED_SERVER_URIS_KEY]?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        }
 
     suspend fun setAccentTheme(themeId: String) {
         context.dataStore.edit { preferences ->
@@ -123,6 +128,24 @@ class DataStoreManager(private val context: Context) {
             }
         }
     }
+
+    suspend fun setHideStatusBar(hide: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[HIDE_STATUS_BAR_KEY] = hide
+        }
+    }
+
+    val hideStatusBar: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[HIDE_STATUS_BAR_KEY] ?: false }
+
+    suspend fun setHideNavigationBar(hide: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[HIDE_NAVIGATION_BAR_KEY] = hide
+        }
+    }
+
+    val hideNavigationBar: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[HIDE_NAVIGATION_BAR_KEY] ?: false }
 
     val tunnelServerUri: Flow<String?> = context.dataStore.data
         .map { preferences -> preferences[TUNNEL_SERVER_URI_KEY] }

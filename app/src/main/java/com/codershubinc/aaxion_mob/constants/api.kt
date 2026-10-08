@@ -13,13 +13,6 @@ object API_ENDPOINTS {
     }
 
     // ==========================================
-    // WebDAV
-    // ==========================================
-    object WEBDAV {
-        const val ROOT = "/webdav/"
-    }
-
-    // ==========================================
     // Files & Directories
     // ==========================================
     object FILES {
@@ -83,58 +76,5 @@ object API_ENDPOINTS {
         const val INFO = "/api/v1/system/info"
         const val GET_ROOT_PATH = "/api/v1/system/root-path"
         const val STORAGE = "/api/v1/system/storage"
-    }
-
-    // ==========================================
-    // Movies
-    // ==========================================
-    object MOVIES {
-        const val LIST = "/api/v1/movies"
-        const val SEARCH = "/api/v1/movies/search"
-        const val ADD = "/api/v1/movies/add"
-        const val EDIT = "/api/v1/movies/edit"
-        const val STREAM = "/api/v1/movies/stream"
-    }
-
-    // ==========================================
-    // Series & Episodes
-    // ==========================================
-    object SERIES {
-        const val LIST = "/api/v1/series"
-        const val SEARCH = "/api/v1/series/search"
-        const val ADD = "/api/v1/series/add"
-        const val EDIT = "/api/v1/series/edit"
-        const val EPISODES = "/api/v1/series/episodes"
-        const val EPISODE_ADD = "/api/v1/series/episodes/add"
-        const val EPISODE_STREAM = "/api/v1/series/episodes/stream"
-    }
-
-    // ==========================================
-    // Music
-    // ==========================================
-    object MUSIC {
-        const val TRACKS = "/api/v1/music"
-        const val GET = "/api/v1/music/get"
-        const val SEARCH = "/api/v1/music/search"
-        const val ADD = "/api/v1/music/add"
-        const val UPDATE = "/api/v1/music/update"
-        const val STREAM = "/api/v1/music/stream"
-
-        object STATS {
-            const val PLAY = "/api/v1/music/stats/play"
-            const val FAVORITE = "/api/v1/music/stats/favorite"
-            const val PLAY_STATE = "/api/v1/music/stats/play-state"
-            const val PLAY_STATES = "/api/v1/music/stats/play-states"
-            const val IS_FAVORITE = "/api/v1/music/stats/is-favorite"
-            const val LAST_PLAYED = "/api/v1/music/stats/last-played"
-        }
-    }
-
-    // ==========================================
-    // WebSockets & Devices
-    // ==========================================
-    object DEVICES {
-        const val LIST = "/api/v1/devices"
-        const val WS = "/api/v1/ws"
     }
 }

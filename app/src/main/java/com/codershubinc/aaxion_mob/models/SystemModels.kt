@@ -17,7 +17,7 @@ data class StorageInfoResponse(
     @SerializedName("usage_percentage")
     val usagePercentage: Double,
     @SerializedName("external_devices")
-    val externalDevices: List<ExternalDeviceInfo> = emptyList()
+    val externalDevices: List<ExternalDeviceInfo>? = emptyList()
 )
 
 data class ExternalDeviceInfo(

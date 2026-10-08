@@ -1,0 +1,88 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <!-- Background rounded rectangle with vertical gradient -->
+    <path
+        android:pathData="M144,32h224a112,112 0 0 1 112,112v224a112,112 0 0 1 -112,112h-224a112,112 0 0 1 -112,-112v-224a112,112 0 0 1 112,-112z"
+        android:fillColor="@android:color/transparent">
+        <gradient
+            android:type="linear"
+            android:startX="0"
+            android:startY="0"
+            android:endX="0"
+            android:endY="512">
+            <item android:offset="0" android:color="#1E1B4B"/>
+            <item android:offset="1" android:color="#0B0F19"/>
+        </gradient>
+    </path>
+
+    <!-- Stroke for background (approximated with solid color) -->
+    <path
+        android:pathData="M144,32h224a112,112 0 0 1 112,112v224a112,112 0 0 1 -112,112h-224a112,112 0 0 1 -112,-112v-224a112,112 0 0 1 112,-112z"
+        android:strokeWidth="4"
+        android:strokeColor="#A855F7"
+        android:strokeAlpha="0.5"/>
+
+    <!-- Left leg rotated 25° with gradient -->
+    <group
+        android:translateX="180"
+        android:translateY="110"
+        android:pivotX="0"
+        android:pivotY="0"
+        android:rotation="25">
+        <path
+            android:pathData="M0,0 h80 a40,40 0 0 1 0,280 h-80 a40,40 0 0 1 0,-280 z"
+            android:fillColor="@android:color/transparent">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="80"
+                android:endY="280">
+                <item android:offset="0" android:color="#06B6D4"/>
+                <item android:offset="1" android:color="#3B82F6"/>
+            </gradient>
+        </path>
+    </group>
+
+    <!-- Right leg rotated -25° with gradient -->
+    <group
+        android:translateX="240"
+        android:translateY="75"
+        android:pivotX="0"
+        android:pivotY="0"
+        android:rotation="-25">
+        <path
+            android:pathData="M0,0 h80 a40,40 0 0 1 0,280 h-80 a40,40 0 0 1 0,-280 z"
+            android:fillColor="@android:color/transparent">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="80"
+                android:endY="280">
+                <item android:offset="0" android:color="#A855F7"/>
+                <item android:offset="1" android:color="#4F46E5"/>
+            </gradient>
+        </path>
+    </group>
+
+    <!-- White triangle -->
+    <path
+        android:pathData="M230,240 L300,280 L230,320 Z"
+        android:fillColor="#FFFFFFFF"/>
+
+    <!-- Bottom left circle -->
+    <path
+        android:pathData="M165,365 m-16,0 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0"
+        android:fillColor="#FF06B6D4"/>
+
+    <!-- Bottom right circle -->
+    <path
+        android:pathData="M345,365 m-16,0 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0"
+        android:fillColor="#FFA855F7"/>
+
+</vector>

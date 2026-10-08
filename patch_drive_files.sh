@@ -1,0 +1,1 @@
+sed -i 's/columns = GridCells.Adaptive(minSize = if (isTablet) 100.dp else 88.dp),/columns = GridCells.Adaptive(minSize = 120.dp),/' app/src/main/java/com/codershubinc/aaxion_mob/ui/views/DriveFilesView.kt

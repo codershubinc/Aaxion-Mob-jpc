@@ -61,7 +61,7 @@ import com.codershubinc.aaxion_mob.ui.components.InteractiveBreadcrumbs
 import com.codershubinc.aaxion_mob.ui.components.StorageInfoTile
 import com.codershubinc.aaxion_mob.ui.theme.*
 import com.codershubinc.aaxion_mob.ui.views.DriveFilesView
-import com.codershubinc.aaxion_mob.ui.views.SidebarStorageDevices
+import com.codershubinc.aaxion_mob.ui.components.navigation.Sidebar
 import com.codershubinc.aaxion_mob.ui.views.StorageAndHubView
 import com.codershubinc.aaxion_mob.ui.views.StreamerMediaView
 import com.codershubinc.aaxion_mob.utils.DataStoreManager
@@ -483,220 +483,22 @@ fun AaxionDriveScreen(
                 }
             }
         }
-        // Dimmed overlay for mobile/tablet to tap and close the sidebar
-        if (!isDesktop) {
-            androidx.compose.animation.AnimatedVisibility(
-                visible = isSidebarVisible,
-                enter = androidx.compose.animation.fadeIn(animationSpec = tween(150)),
-                exit = androidx.compose.animation.fadeOut(animationSpec = tween(150))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
-                        .clickable(
-                            interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                            indication = null
-                        ) { isSidebarVisible = false }
-                )
+        Sidebar(
+            isVisible = isSidebarVisible,
+            isDesktop = isDesktop,
+            serverUri = serverUri,
+            activeServerUri = activeServerUri,
+            effectiveToken = effectiveToken,
+            prioritizedServerUris = prioritizedServerUris,
+            currentTab = currentTab,
+            onTabSelected = { currentTab = it },
+            onCloseSidebar = { isSidebarVisible = false },
+            onNavigateToConnectionManager = onNavigateToConnectionManager,
+            onSelectStorageDevice = { targetPath ->
+                currentTab = 0
+                viewModel.navigateTo(serverUri, effectiveToken, targetPath, tokenManager = tokenManager)
             }
-        }
-                // Collapsible Sidebar with rounded corners (Overlaid with smooth slide, 0 frame drops)
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = isSidebarVisible,
-                    enter = androidx.compose.animation.slideInHorizontally(
-                        initialOffsetX = { -it },
-                        animationSpec = tween(durationMillis = 200)
-                    ) + androidx.compose.animation.fadeIn(animationSpec = tween(150)),
-                    exit = androidx.compose.animation.slideOutHorizontally(
-                        targetOffsetX = { -it },
-                        animationSpec = tween(durationMillis = 200)
-                    ) + androidx.compose.animation.fadeOut(animationSpec = tween(150)),
-                    modifier = Modifier.align(Alignment.CenterStart)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .width(260.dp)
-                            .fillMaxHeight()
-                            .padding(8.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(AaxionSurface)
-                            .border(1.dp, AaxionBorder, RoundedCornerShape(16.dp))
-                            .padding(14.dp),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        // Top Section: Header & Nav
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            // Header with Hide Sidebar button
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Image(
-                                        painter = painterResource(id = R.drawable.aaxion_logo),
-                                        contentDescription = "Aaxion logo",
-                                        modifier = Modifier.size(48.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .clickable { onNavigateToConnectionManager() }
-                                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = "AAXION",
-                                            color = TextPrimary,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Black,
-                                            letterSpacing = 1.2.sp
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            val displayHost = remember(serverUri) {
-                                                try {
-                                                    val u = android.net.Uri.parse(serverUri)
-                                                    u.host ?: serverUri
-                                                } catch (e: Exception) {
-                                                    serverUri
-                                                }
-                                            }
-                                            Text(
-                                                text = displayHost.ifBlank { "No Server" },
-                                                color = TextSecondary,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Normal,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            if (prioritizedServerUris.contains(activeServerUri)) {
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Icon(
-                                                    imageVector = Icons.Default.Star,
-                                                    contentDescription = "Pinned IP",
-                                                    tint = AaxionPrimary,
-                                                    modifier = Modifier.size(10.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                if (!isDesktop) {
-                                    IconButton(
-                                        onClick = { isSidebarVisible = false },
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.MenuOpen,
-                                            contentDescription = "Hide Sidebar",
-                                            tint = TextSecondary,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // Navigation Items
-                            TabletSidebarItem(
-                                icon = Icons.Default.Folder,
-                                label = "My Drive",
-                                isSelected = currentTab == 0,
-                                onClick = { currentTab = 0 }
-                            )
-                        }
-
-                        // Bottom Section: Storage Devices Tiles & Settings Icon
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            HorizontalDivider(color = AaxionBorder, thickness = 1.dp)
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Storage Device Tiles directly at bottom of sidebar!
-                            SidebarStorageDevices(
-                                serverUri = activeServerUri,
-                                token = effectiveToken,
-                                onSelectStorageDevice = { targetPath ->
-                                    currentTab = 0
-                                    viewModel.navigateTo(serverUri, effectiveToken, targetPath, tokenManager = tokenManager)
-                                }
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            HorizontalDivider(color = AaxionBorder, thickness = 1.dp)
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Settings Action Icon at Bottom
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { currentTab = 3 }
-                                    .background(if (currentTab == 3) AaxionPrimary.copy(alpha = 0.12f) else Color.Transparent)
-                                    .padding(vertical = 8.dp, horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = "Settings",
-                                    tint = if (currentTab == 3) AaxionPrimary else TextSecondary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "Settings",
-                                    color = if (currentTab == 3) AaxionPrimary else TextSecondary,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-                }
-
-    }
-}
-
-// Tablet Sidebar Item
-@Composable
-private fun TabletSidebarItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) AaxionPrimary.copy(alpha = 0.15f) else Color.Transparent)
-            .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (isSelected) AaxionPrimary else TextSecondary,
-            modifier = Modifier.size(18.dp)
         )
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = label,
-            color = if (isSelected) Color.White else TextSecondary,
-            fontSize = 12.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-        )
-        
     }
 }
 

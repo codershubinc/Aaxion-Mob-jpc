@@ -4,21 +4,33 @@ import android.app.Activity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.compositionLocalOf
-import com.codershubinc.aaxion_mob.models.AccentTheme
-import com.codershubinc.aaxion_mob.models.IconPackTheme
+import com.codershubinc.aaxion_mob.core.model.AccentTheme
+import com.codershubinc.aaxion_mob.core.model.IconPackTheme
 
 val LocalAccentColor = compositionLocalOf { AaxionPrimary }
 val LocalIconPack = compositionLocalOf { IconPackTheme.MINIMAL_ROUNDED }
+
+/**
+ * Convenience accessor for active Aaxion theme properties
+ */
+object AaxionTheme {
+    val accent: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalAccentColor.current
+
+    val iconPack: IconPackTheme
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalIconPack.current
+}
 
 fun getAaxionColorScheme(accentColor: Color = AaxionPrimary): androidx.compose.material3.ColorScheme {
     return darkColorScheme(
@@ -60,11 +72,6 @@ fun AaxionMobTheme(
             if (window != null) {
                 window.statusBarColor = AaxionBg.toArgb()
                 window.navigationBarColor = AaxionBg.toArgb()
-
-                // Hide system notification bar & navigation bar into full immersive mode
-                val insetsController = WindowCompat.getInsetsController(window, view)
-                insetsController.hide(WindowInsetsCompat.Type.systemBars())
-                insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         }
     }

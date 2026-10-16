@@ -46,9 +46,12 @@ val AaxionDanger = Color(0xFFEF4444)
 
 // Text Hierarchies
 val TextPrimary = Color(0xFFFFFFFF)
-val TextSecondary = Color(0xFFAAAAAA)
-val TextTertiary = Color(0xFF666666)
-val TextMuted = Color(0xFF333333)
+val TextSecondary = Color(0xFF98989F)
+val TextTertiary = Color(0xFF636366)
+val TextMuted = Color(0xFF3A3A3C)
+
+// Hairline Divider Token
+val GlassHairline = Color.White.copy(alpha = 0.07f)
 
 // Backward-compatibility aliases
 val AaxionCyan = AaxionPrimary
@@ -61,16 +64,16 @@ val AaxionViolet = AaxionPrimary
 val AaxionSurfaceHigh = AaxionSurfaceLevel2
 
 /**
- * Obsidian Glassmorphism Brushes for surface fills and specular rim lighting
+ * Spatial Glass Brushes for surface fills and specular rim lighting
  */
 object GlassBrushes {
     fun glassSurface(accent: Color = Color.Transparent, isHighlighted: Boolean = false): Brush {
         val startColor = if (isHighlighted && accent != Color.Transparent) {
-            accent.copy(alpha = 0.14f)
+            accent.copy(alpha = 0.16f)
         } else {
-            Color(0xFF16161F).copy(alpha = 0.82f)
+            Color(0xFF1C1C22).copy(alpha = 0.76f)
         }
-        val endColor = Color(0xFF08080C).copy(alpha = 0.94f)
+        val endColor = Color(0xFF0C0C10).copy(alpha = 0.90f)
         return Brush.linearGradient(
             colors = listOf(startColor, endColor),
             start = Offset.Zero,
@@ -82,9 +85,9 @@ object GlassBrushes {
         val startColor = if (accent != null && accent != Color.Transparent) {
             accent.copy(alpha = 0.55f)
         } else {
-            Color.White.copy(alpha = 0.18f)
+            Color.White.copy(alpha = 0.22f)
         }
-        val endColor = Color.White.copy(alpha = 0.02f)
+        val endColor = Color.White.copy(alpha = 0.03f)
         return Brush.linearGradient(
             colors = listOf(startColor, endColor),
             start = Offset.Zero,

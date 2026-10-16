@@ -1,4 +1,4 @@
-package com.codershubinc.aaxion_mob.ui
+package com.codershubinc.aaxion_mob.feature.drive
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -8,13 +8,18 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -36,6 +41,7 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,26 +58,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
-import com.codershubinc.aaxion_mob.auth.TokenManager
-import com.codershubinc.aaxion_mob.models.FileItem
-import com.codershubinc.aaxion_mob.models.StorageInfoResponse
-import com.codershubinc.aaxion_mob.ui.components.AaxionCard
-import com.codershubinc.aaxion_mob.ui.components.InteractiveBreadcrumbs
-
-import com.codershubinc.aaxion_mob.ui.components.StorageInfoTile
+import com.codershubinc.aaxion_mob.core.data.DataStoreManager
+import com.codershubinc.aaxion_mob.core.data.TokenManager
+import com.codershubinc.aaxion_mob.core.model.FileItem
+import com.codershubinc.aaxion_mob.core.model.StorageInfoResponse
+import com.codershubinc.aaxion_mob.core.network.Fetcher
+import com.codershubinc.aaxion_mob.core.network.ServerPingHelper
+import com.codershubinc.aaxion_mob.core.util.IntentUtils
+import com.codershubinc.aaxion_mob.feature.settings.SettingsScreen
+import com.codershubinc.aaxion_mob.feature.storage.StorageAndHubView
+import com.codershubinc.aaxion_mob.feature.storage.StorageInfoTile
+import com.codershubinc.aaxion_mob.feature.streamer.StreamerMediaView
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionCard
+import com.codershubinc.aaxion_mob.ui.designsystem.*
 import com.codershubinc.aaxion_mob.ui.theme.*
-import com.codershubinc.aaxion_mob.ui.views.DriveFilesView
-import com.codershubinc.aaxion_mob.ui.components.navigation.Sidebar
-import com.codershubinc.aaxion_mob.ui.views.StorageAndHubView
-import com.codershubinc.aaxion_mob.ui.views.StreamerMediaView
-import com.codershubinc.aaxion_mob.utils.DataStoreManager
-import com.codershubinc.aaxion_mob.utils.Fetcher
-import com.codershubinc.aaxion_mob.utils.IntentUtils
-import com.codershubinc.aaxion_mob.viewmodels.FileCategory
-import com.codershubinc.aaxion_mob.viewmodels.FileViewModel
 import kotlinx.coroutines.launch
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -82,20 +83,20 @@ fun AaxionDriveScreen(
     tunnelUri: String? = null,
     token: String,
     viewModel: FileViewModel,
+    prioritizedServerUris: List<String> = emptyList(),
     discoveredUris: List<String> = emptyList(),
     onLogout: () -> Unit,
-    onNavigateToConnectionManager: () -> Unit
+    onNavigateToConnectionManager: () -> Unit,
+    onNavigateToSettings: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val accentColor = LocalAccentColor.current
     val scope = rememberCoroutineScope()
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp
     val isMobile = screenWidth < 768
     val isDesktop = screenWidth > 1024
     val isTablet = !isMobile && !isDesktop
-
-    val dataStoreManager = remember { DataStoreManager(context) }
-    val prioritizedServerUris by dataStoreManager.prioritizedServerUris.collectAsState(initial = emptyList())
 
     val tokenManager = remember { TokenManager.getInstance(context) }
     val isRefreshingToken by tokenManager.isRefreshing.collectAsState()
@@ -106,16 +107,18 @@ fun AaxionDriveScreen(
     val effectiveToken = if (!activeAccessToken.isNullOrBlank()) activeAccessToken!! else token
 
     // Tabs: 0 = Drive, 1 = Streamer, 2 = Storage & Tokens, 3 = Settings
-    var currentTab by remember { mutableIntStateOf(0) }
-    var isGridView by remember { mutableStateOf(true) }
+    var currentTab by rememberSaveable { mutableIntStateOf(0) }
+    var isGridView by rememberSaveable { mutableStateOf(true) }
     var isSidebarVisible by remember(isDesktop) { mutableStateOf(isDesktop) }
 
-    // Intercept system Back button: Navigate back in dir tree first, or return to Drive tab
-    BackHandler(enabled = (viewModel.currentPath != "/" && viewModel.currentPath.isNotEmpty()) || currentTab != 0) {
-        if (viewModel.currentPath != "/" && viewModel.currentPath.isNotEmpty()) {
-            viewModel.navigateUp(serverUri, effectiveToken, tokenManager = tokenManager)
+    // Intercept system Back button: Close sidebar drawer, return to Drive tab, or navigate back in dir tree
+    BackHandler(enabled = (isSidebarVisible && !isDesktop) || currentTab != 0 || (viewModel.currentPath != "/" && viewModel.currentPath.isNotEmpty())) {
+        if (isSidebarVisible && !isDesktop) {
+            isSidebarVisible = false
         } else if (currentTab != 0) {
             currentTab = 0
+        } else if (viewModel.currentPath != "/" && viewModel.currentPath.isNotEmpty()) {
+            viewModel.navigateUp(serverUri, effectiveToken, tokenManager = tokenManager)
         }
     }
 
@@ -127,30 +130,11 @@ fun AaxionDriveScreen(
 
     LaunchedEffect(prioritizedServerUris, discoveredUris, tunnelUri) {
         while (isActive) {
-            val client = Fetcher.getInstance().getClient()
-            
-            suspend fun ping(uri: String): Long? {
-                if (uri.isBlank()) return null
-                val cleanUri = if (uri.endsWith("/")) uri.dropLast(1) else uri
-                val pingUrl = "$cleanUri/api/v1/system/storage"
-                return try {
-                    val request = okhttp3.Request.Builder().url(pingUrl).head().build()
-                    val startTime = System.currentTimeMillis()
-                    val response = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                        try { client.newCall(request).execute() } catch (e: Exception) { null }
-                    }
-                    val elapsed = System.currentTimeMillis() - startTime
-                    if (response != null && (response.isSuccessful || response.code in 200..499)) {
-                        response.close()
-                        elapsed
-                    } else null
-                } catch (e: Exception) { null }
-            }
-
             var found = false
             // 1. Try Prioritized URIs in order
             for (uri in prioritizedServerUris) {
-                val lat = ping(uri)
+                if (uri.isBlank()) continue
+                val lat = ServerPingHelper.pingServer(uri = uri)
                 if (lat != null) {
                     isServerOnline = true
                     isLocalConnection = true
@@ -163,9 +147,9 @@ fun AaxionDriveScreen(
 
             // 2. Try Discovered URIs
             if (!found) {
-                val remainingUris = discoveredUris.filter { !prioritizedServerUris.contains(it) }
+                val remainingUris = discoveredUris.filter { !prioritizedServerUris.contains(it) && it.isNotBlank() }
                 for (uri in remainingUris) {
-                    val lat = ping(uri)
+                    val lat = ServerPingHelper.pingServer(uri = uri)
                     if (lat != null) {
                         isServerOnline = true
                         isLocalConnection = true
@@ -179,7 +163,7 @@ fun AaxionDriveScreen(
 
             // 3. Try Tunnel URI
             if (!found && !tunnelUri.isNullOrBlank()) {
-                val lat = ping(tunnelUri!!)
+                val lat = ServerPingHelper.pingServer(uri = tunnelUri!!)
                 if (lat != null) {
                     isServerOnline = true
                     isLocalConnection = false
@@ -207,11 +191,7 @@ fun AaxionDriveScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AaxionBg)
-    ) {
+    AmoledGlassBackground(accentColor = accentColor) {
         if (!isMobile) {
             // ==========================================
             // TABLET/DESKTOP RESPONSIVE LAYOUT (Collapsible / Fixed Sidebar)
@@ -221,6 +201,7 @@ fun AaxionDriveScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .navigationBarsPadding()
                         .padding(start = if (isDesktop && isSidebarVisible) 268.dp else 0.dp)
                 ) {
                     when (currentTab) {
@@ -232,90 +213,13 @@ fun AaxionDriveScreen(
                             onToggleView = { isGridView = !isGridView },
                             isSidebarVisible = isSidebarVisible,
                             onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
-                            onOpenSettings = { currentTab = 3 },
-                            isTablet = true,
-                            isServerOnline = isServerOnline,
-                            isLocalConnection = isLocalConnection
-                        )
-                        1 -> StreamerMediaView(
-                            serverUri = activeServerUri,
-                            token = effectiveToken,
-                            viewModel = viewModel,
-                            isSidebarVisible = isSidebarVisible,
-                            onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
-                            isTablet = true
-                        )
-                        2 -> StorageAndHubView(
-                            serverUri = activeServerUri,
-                            token = effectiveToken,
-                            masterToken = activeMasterToken,
-                            lastRefreshTs = lastRefreshTs,
-                            isRefreshing = isRefreshingToken,
-                            onRefreshToken = {
-                                scope.launch {
-                                    val success = tokenManager.refreshAccessToken(serverUri)
-                                    val msg = if (success) "Access token refreshed" else "Refresh failed"
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                }
+                            onOpenSettings = {
+                                currentTab = 3
                             },
-                            onOpenIpSelector = onNavigateToConnectionManager,
-                            onLogout = onLogout
-                        )
-                        3 -> SettingsScreen(
-                            serverUri = activeServerUri,
-                            token = effectiveToken,
-                            onBackClick = { currentTab = 0 },
-                            onLogout = onLogout,
-                            onNavigateToConnectionManager = onNavigateToConnectionManager
-                        )
-                    }
-                }
-
-            }
-        } else {
-            isServerOnline = false
-            serverLatencyMs = null
-        }
-    }
-
-    // Initial load
-    LaunchedEffect(activeServerUri, effectiveToken) {
-        if (activeServerUri.isNotBlank() && effectiveToken.isNotBlank()) {
-            if (viewModel.files.isEmpty()) {
-                viewModel.fetchFiles(activeServerUri, effectiveToken, "/", tokenManager = tokenManager)
-            }
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AaxionBg)
-    ) {
-        if (!isMobile) {
-            // ==========================================
-            // TABLET/DESKTOP RESPONSIVE LAYOUT (Collapsible / Fixed Sidebar)
-            // ==========================================
-            Box(modifier = Modifier.fillMaxSize()) {
-                // Main Content Canvas (Uses full screen or left-padded for desktop sidebar)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(start = if (isDesktop && isSidebarVisible) 268.dp else 0.dp)
-                ) {
-                    when (currentTab) {
-                        0 -> DriveFilesView(
-                            serverUri = activeServerUri,
-                            token = effectiveToken,
-                            viewModel = viewModel,
-                            isGridView = isGridView,
-                            onToggleView = { isGridView = !isGridView },
-                            isSidebarVisible = isSidebarVisible,
-                            onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
-                            onOpenSettings = { currentTab = 3 },
                             isTablet = true,
                             isServerOnline = isServerOnline,
-                            isLocalConnection = isLocalConnection
+                            isLocalConnection = isLocalConnection,
+                            onOpenConnectionManager = onNavigateToConnectionManager
                         )
                         1 -> StreamerMediaView(
                             serverUri = activeServerUri,
@@ -331,6 +235,13 @@ fun AaxionDriveScreen(
                             masterToken = activeMasterToken,
                             lastRefreshTs = lastRefreshTs,
                             isRefreshing = isRefreshingToken,
+                            onSelectStorageDevice = { targetPath ->
+                                currentTab = 0
+                                if (!isDesktop) {
+                                    isSidebarVisible = false
+                                }
+                                viewModel.navigateTo(serverUri, effectiveToken, targetPath, tokenManager = tokenManager)
+                            },
                             onRefreshToken = {
                                 scope.launch {
                                     val success = tokenManager.refreshAccessToken(serverUri)
@@ -358,69 +269,100 @@ fun AaxionDriveScreen(
             // ==========================================
             Scaffold(
                 containerColor = Color.Transparent,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 bottomBar = {
-                    NavigationBar(
-                        containerColor = AaxionSurface,
-                        contentColor = TextPrimary,
-                        tonalElevation = 0.dp,
-                        modifier = Modifier.border(
-                            width = 1.dp,
-                            color = AaxionBorder,
-                            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-                        )
+                    val dockShape = RoundedCornerShape(28.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 20.dp, vertical = 10.dp)
+                            .clip(dockShape)
+                            .background(GlassBrushes.glassSurface())
+                            .border(
+                                width = 0.8.dp,
+                                brush = GlassBrushes.specularBorder(accentColor),
+                                shape = dockShape
+                            )
                     ) {
-                        NavigationBarItem(
-                            selected = currentTab == 0,
-                            onClick = { currentTab = 0 },
-                            icon = { Icon(Icons.Default.CloudQueue, contentDescription = "Drive") },
-                            label = { Text("Drive", fontSize = 10.sp, fontWeight = if (currentTab == 0) FontWeight.Bold else FontWeight.Normal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = AaxionPrimary,
-                                selectedTextColor = AaxionPrimary,
-                                indicatorColor = AaxionPrimary.copy(alpha = 0.15f),
-                                unselectedIconColor = TextTertiary,
-                                unselectedTextColor = TextTertiary
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(62.dp)
+                                .padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val tabs = listOf(
+                                Triple("Drive", Icons.Default.CloudQueue, 0),
+                                Triple("Streamer", Icons.Default.PlayCircleFilled, 1),
+                                Triple("Storage", Icons.Default.Storage, 2),
+                                Triple("Settings", Icons.Default.Settings, 3)
                             )
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 1,
-                            onClick = { currentTab = 1 },
-                            icon = { Icon(Icons.Default.PlayCircleFilled, contentDescription = "Streamer") },
-                            label = { Text("Streamer", fontSize = 10.sp, fontWeight = if (currentTab == 1) FontWeight.Bold else FontWeight.Normal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = StreamerOrange,
-                                selectedTextColor = StreamerOrange,
-                                indicatorColor = StreamerOrange.copy(alpha = 0.15f),
-                                unselectedIconColor = TextTertiary,
-                                unselectedTextColor = TextTertiary
-                            )
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 2,
-                            onClick = { currentTab = 2 },
-                            icon = { Icon(Icons.Default.Storage, contentDescription = "Storage") },
-                            label = { Text("Storage", fontSize = 10.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Normal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = AaxionElectricBlue,
-                                selectedTextColor = AaxionElectricBlue,
-                                indicatorColor = AaxionElectricBlue.copy(alpha = 0.15f),
-                                unselectedIconColor = TextTertiary,
-                                unselectedTextColor = TextTertiary
-                            )
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 3,
-                            onClick = { currentTab = 3 },
-                            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                            label = { Text("Settings", fontSize = 10.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Normal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = AaxionPrimary,
-                                selectedTextColor = AaxionPrimary,
-                                indicatorColor = AaxionPrimary.copy(alpha = 0.15f),
-                                unselectedIconColor = TextTertiary,
-                                unselectedTextColor = TextTertiary
-                            )
-                        )
+
+                            tabs.forEach { (title, icon, index) ->
+                                val isSelected = currentTab == index
+                                val tabColor = if (index == 1) StreamerOrange else accentColor
+
+                                val scale by animateFloatAsState(
+                                    targetValue = if (isSelected) 1.05f else 1f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    ),
+                                    label = "dock_tab_scale"
+                                )
+
+                                val pillAlpha by animateFloatAsState(
+                                    targetValue = if (isSelected) 0.16f else 0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    ),
+                                    label = "dock_pill_alpha"
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(vertical = 6.dp, horizontal = 4.dp)
+                                        .graphicsLayer {
+                                            scaleX = scale
+                                            scaleY = scale
+                                        }
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .background(tabColor.copy(alpha = pillAlpha))
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = ripple(bounded = true, color = tabColor),
+                                            onClick = {
+                                                currentTab = index
+                                            }
+                                        )
+                                        .padding(vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = title,
+                                            tint = if (isSelected) tabColor else TextTertiary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = title,
+                                            color = if (isSelected) tabColor else TextTertiary,
+                                            fontSize = 10.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             ) { paddingValues ->
@@ -438,10 +380,13 @@ fun AaxionDriveScreen(
                             onToggleView = { isGridView = !isGridView },
                             isSidebarVisible = isSidebarVisible,
                             onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
-                            onOpenSettings = { currentTab = 3 },
+                            onOpenSettings = {
+                                currentTab = 3
+                            },
                             isTablet = false,
                             isServerOnline = isServerOnline,
-                            isLocalConnection = isLocalConnection
+                            isLocalConnection = isLocalConnection,
+                            onOpenConnectionManager = onNavigateToConnectionManager
                         )
                         1 -> StreamerMediaView(
                             serverUri = activeServerUri,
@@ -457,9 +402,11 @@ fun AaxionDriveScreen(
                             masterToken = activeMasterToken,
                             lastRefreshTs = lastRefreshTs,
                             isRefreshing = isRefreshingToken,
-                            showStorageDevices = true,
                             onSelectStorageDevice = { targetPath ->
                                 currentTab = 0
+                                if (!isDesktop) {
+                                    isSidebarVisible = false
+                                }
                                 viewModel.navigateTo(serverUri, effectiveToken, targetPath, tokenManager = tokenManager)
                             },
                             onRefreshToken = {
@@ -491,11 +438,24 @@ fun AaxionDriveScreen(
             effectiveToken = effectiveToken,
             prioritizedServerUris = prioritizedServerUris,
             currentTab = currentTab,
-            onTabSelected = { currentTab = it },
+            onTabSelected = { tab ->
+                currentTab = tab
+                if (!isDesktop) {
+                    isSidebarVisible = false
+                }
+            },
             onCloseSidebar = { isSidebarVisible = false },
-            onNavigateToConnectionManager = onNavigateToConnectionManager,
+            onNavigateToConnectionManager = {
+                if (!isDesktop) {
+                    isSidebarVisible = false
+                }
+                onNavigateToConnectionManager()
+            },
             onSelectStorageDevice = { targetPath ->
                 currentTab = 0
+                if (!isDesktop) {
+                    isSidebarVisible = false
+                }
                 viewModel.navigateTo(serverUri, effectiveToken, targetPath, tokenManager = tokenManager)
             }
         )

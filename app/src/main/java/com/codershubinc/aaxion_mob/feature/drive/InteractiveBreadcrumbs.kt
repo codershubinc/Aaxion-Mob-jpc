@@ -1,4 +1,4 @@
-package com.codershubinc.aaxion_mob.ui.components
+package com.codershubinc.aaxion_mob.feature.drive
 
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Usb
@@ -24,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.codershubinc.aaxion_mob.ui.designsystem.*
 import com.codershubinc.aaxion_mob.ui.theme.*
 
 data class BreadcrumbSegment(
@@ -40,6 +42,7 @@ fun InteractiveBreadcrumbs(
     itemCount: Int,
     accentColor: Color,
     onNavigate: (path: String) -> Unit,
+    onNavigateUp: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -88,13 +91,14 @@ fun InteractiveBreadcrumbs(
         scrollState.animateScrollTo(scrollState.maxValue)
     }
 
+    val breadcrumbShape = RoundedCornerShape(8.dp)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF070707))
-            .border(1.dp, AaxionBorder.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            .clip(breadcrumbShape)
+            .background(GlassSurfaceLow)
+            .border(1.dp, GlassBrushes.specularBorder(), breadcrumbShape)
             .combinedClickable(
                 onClick = {},
                 onLongClick = { 
@@ -104,6 +108,26 @@ fun InteractiveBreadcrumbs(
             )
             .padding(horizontal = 8.dp, vertical = 5.dp)
     ) {
+        val canGoUp = currentPath != "/" && currentPath.isNotEmpty() && onNavigateUp != null
+        if (canGoUp) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(accentColor.copy(alpha = 0.14f))
+                    .clickable { onNavigateUp?.invoke() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Up",
+                    tint = accentColor,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+        }
+
         // Scrollable crumbs row
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -204,63 +228,67 @@ fun InteractiveBreadcrumbs(
     }
 
     if (showPathDialog) {
-        AlertDialog(
+        GlassDialog(
             onDismissRequest = { showPathDialog = false },
-            title = {
-                Text(
-                    text = "Go to Directory",
-                    color = TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                OutlinedTextField(
-                    value = customPathInput,
-                    onValueChange = { customPathInput = it },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = accentColor,
-                        unfocusedBorderColor = AaxionBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextSecondary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            containerColor = AaxionSurfaceVariant,
-            confirmButton = {
-                TextButton(onClick = {
-                    showPathDialog = false
-                    var targetPath = customPathInput.trim()
-                    
-                    val lastSlashIdx = targetPath.lastIndexOf('/')
-                    val lastPart = if (lastSlashIdx != -1) targetPath.substring(lastSlashIdx + 1) else targetPath
-                    
-                    val dotIndex = lastPart.lastIndexOf('.')
-                    val hasValidExtension = if (dotIndex > 0 && dotIndex < lastPart.length - 1) {
-                        val ext = lastPart.substring(dotIndex + 1)
-                        ext.length in 1..5 && ext.all { it.isLetterOrDigit() }
-                    } else false
-
-                    if (hasValidExtension && !targetPath.endsWith("/")) {
-                        targetPath = if (lastSlashIdx != -1) targetPath.substring(0, lastSlashIdx) else "/"
-                        if (targetPath.isEmpty()) targetPath = "/"
-                        Toast.makeText(context, "File path detected. Navigating to parent directory...", Toast.LENGTH_SHORT).show()
-                    }
-                    
-                    if (targetPath.isNotBlank()) {
-                        onNavigate(targetPath)
-                    }
-                }) {
-                    Text("GO", color = accentColor, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
+            accentHighlight = accentColor
+        ) {
+            Text(
+                text = "Go to Directory",
+                color = TextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            OutlinedTextField(
+                value = customPathInput,
+                onValueChange = { customPathInput = it },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = accentColor,
+                    unfocusedBorderColor = AaxionBorder,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextSecondary
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 TextButton(onClick = { showPathDialog = false }) {
                     Text("CANCEL", color = TextSecondary)
                 }
+                Spacer(modifier = Modifier.width(8.dp))
+                GlassButton(
+                    text = "GO",
+                    onClick = {
+                        showPathDialog = false
+                        var targetPath = customPathInput.trim()
+                        
+                        val lastSlashIdx = targetPath.lastIndexOf('/')
+                        val lastPart = if (lastSlashIdx != -1) targetPath.substring(lastSlashIdx + 1) else targetPath
+                        
+                        val dotIndex = lastPart.lastIndexOf('.')
+                        val hasValidExtension = if (dotIndex > 0 && dotIndex < lastPart.length - 1) {
+                            val ext = lastPart.substring(dotIndex + 1)
+                            ext.length in 1..5 && ext.all { it.isLetterOrDigit() }
+                        } else false
+
+                        if (hasValidExtension && !targetPath.endsWith("/")) {
+                            targetPath = if (lastSlashIdx != -1) targetPath.substring(0, lastSlashIdx) else "/"
+                            if (targetPath.isEmpty()) targetPath = "/"
+                            Toast.makeText(context, "File path detected. Navigating to parent directory...", Toast.LENGTH_SHORT).show()
+                        }
+                        
+                        if (targetPath.isNotBlank()) {
+                            onNavigate(targetPath)
+                        }
+                    },
+                    accentColor = accentColor
+                )
             }
-        )
+        }
     }
 }

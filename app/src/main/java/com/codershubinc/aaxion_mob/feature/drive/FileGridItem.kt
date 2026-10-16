@@ -1,4 +1,4 @@
-package com.codershubinc.aaxion_mob.ui.components.files
+package com.codershubinc.aaxion_mob.feature.drive
 
 import android.content.Intent
 import androidx.compose.foundation.background
@@ -18,7 +18,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -29,13 +32,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.codershubinc.aaxion_mob.models.FileItem
-import com.codershubinc.aaxion_mob.ui.components.AaxionCard
-import com.codershubinc.aaxion_mob.ui.components.FileActionModal
+import com.codershubinc.aaxion_mob.core.model.FileItem
+import com.codershubinc.aaxion_mob.core.network.buildThumbUrl
+import com.codershubinc.aaxion_mob.core.util.IntentUtils
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionCard
+import com.codershubinc.aaxion_mob.ui.designsystem.FileVisualIcon
+import com.codershubinc.aaxion_mob.ui.designsystem.resolveFileStyle
 import com.codershubinc.aaxion_mob.ui.theme.*
-import com.codershubinc.aaxion_mob.utils.IntentUtils
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -50,16 +53,8 @@ fun FileGridItem(
     val haptic = LocalHapticFeedback.current
     var showActionModal by remember { mutableStateOf(false) }
 
-    val encodedPath = remember(file.rawPath) {
-        try {
-            URLEncoder.encode(file.rawPath, StandardCharsets.UTF_8.toString())
-        } catch (e: Exception) {
-            file.rawPath
-        }
-    }
-
-    val thumbUrl = remember(baseUrl, encodedPath, token) {
-        "$baseUrl/api/v1/images/thumb?path=$encodedPath&tkn=$token"
+    val thumbUrl = remember(baseUrl, file.rawPath, token) {
+        file.buildThumbUrl(baseUrl, token)
     }
 
     val imageRequest = remember(thumbUrl) {
@@ -70,8 +65,7 @@ fun FileGridItem(
             .build()
     }
 
-    val currentAccent = com.codershubinc.aaxion_mob.ui.theme.LocalAccentColor.current
-    val currentIconPack = com.codershubinc.aaxion_mob.ui.theme.LocalIconPack.current
+    val fileStyle = resolveFileStyle(file)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -91,9 +85,25 @@ fun FileGridItem(
             )
             .padding(horizontal = 4.dp, vertical = 6.dp)
     ) {
-        // Just the Icon / Thumbnail without background tile or border
+        // Translucent obsidian glass tile with specular border and soft radial glow
         Box(
-            modifier = Modifier.size(56.dp),
+            modifier = Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(GlassSurfaceLow)
+                .border(1.dp, AaxionBorder, RoundedCornerShape(12.dp))
+                .drawBehind {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                fileStyle.tint.copy(alpha = 0.18f),
+                                Color.Transparent
+                            ),
+                            center = center,
+                            radius = size.minDimension / 1.4f
+                        )
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
             if (file.isImage) {
@@ -102,41 +112,22 @@ fun FileGridItem(
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(8.dp)),
+                        .clip(RoundedCornerShape(11.dp)),
                     contentScale = ContentScale.Crop
                 )
             } else {
-                Icon(
-                    imageVector = when {
-                        file.isDir -> when (currentIconPack) {
-                            com.codershubinc.aaxion_mob.models.IconPackTheme.MINIMAL_ROUNDED -> Icons.Default.Folder
-                            com.codershubinc.aaxion_mob.models.IconPackTheme.SYSTEM_FILLED -> Icons.Default.FolderShared
-                            com.codershubinc.aaxion_mob.models.IconPackTheme.OUTLINE -> Icons.Default.FolderOpen
-                            com.codershubinc.aaxion_mob.models.IconPackTheme.CYBER_NEON -> Icons.Default.FolderSpecial
-                        }
-                        file.isVideo -> Icons.Default.PlayCircleOutline
-                        file.isAudio -> Icons.Default.MusicNote
-                        file.isDoc -> Icons.Default.Description
-                        else -> Icons.AutoMirrored.Filled.InsertDriveFile
-                    },
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = when {
-                        file.isDir -> currentAccent
-                        file.isVideo -> StreamerOrange
-                        file.isAudio -> StreamerGreen
-                        file.isDoc -> currentAccent
-                        else -> TextSecondary
-                    }
+                FileVisualIcon(
+                    fileStyle = fileStyle,
+                    iconSize = 36.dp
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Just the name below
+        // File name with middle ellipsis, preserving extension and max 2 lines
         Text(
-            text = file.name,
+            text = file.displayName(30),
             color = TextPrimary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Normal,

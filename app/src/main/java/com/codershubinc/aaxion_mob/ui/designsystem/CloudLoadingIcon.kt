@@ -1,4 +1,4 @@
-package com.codershubinc.aaxion_mob.ui.components
+package com.codershubinc.aaxion_mob.ui.designsystem
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.size

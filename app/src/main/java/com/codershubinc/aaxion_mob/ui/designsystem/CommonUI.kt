@@ -1,8 +1,7 @@
-package com.codershubinc.aaxion_mob.ui.components
+package com.codershubinc.aaxion_mob.ui.designsystem
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,12 +17,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+
 import com.codershubinc.aaxion_mob.ui.theme.*
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * Obsidian Glassmorphic Card.
+ * Delegates directly to [GlassCard] with specular rim borders and tactile press physics.
+ */
 @Composable
 fun AaxionCard(
     modifier: Modifier = Modifier,
@@ -34,22 +35,15 @@ fun AaxionCard(
     onLongClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val clickableModifier = if (onClick != null || onLongClick != null) {
-        modifier.clip(RoundedCornerShape(cornerRadius)).combinedClickable(
-            onClick = { onClick?.invoke() },
-            onLongClick = onLongClick
-        )
-    } else {
-        modifier.clip(RoundedCornerShape(cornerRadius))
-    }
-
-    Column(
-        modifier = clickableModifier
-            .background(backgroundColor)
-            .padding(18.dp)
-    ) {
-        content()
-    }
+    GlassCard(
+        modifier = modifier,
+        cornerRadius = cornerRadius,
+        backgroundColor = backgroundColor,
+        borderColor = borderColor,
+        onClick = onClick,
+        onLongClick = onLongClick,
+        content = content
+    )
 }
 
 // Backward compatibility alias for any existing code
@@ -58,17 +52,12 @@ fun ModernCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    AaxionCard(modifier = modifier, content = content)
+    GlassCard(modifier = modifier, content = content)
 }
 
 @Composable
 fun AaxionBackgroundGlows() {
-    // Kept minimal to maintain pure pitch black AMOLED contrast
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AaxionBg)
-    )
+    AmoledGlassBackground { }
 }
 
 @Composable
@@ -88,6 +77,7 @@ fun StatusBadge(
         modifier = modifier
             .clip(RoundedCornerShape(CornerRadiusSmall))
             .background(color.copy(alpha = 0.12f))
+            .border(1.dp, color.copy(alpha = 0.25f), RoundedCornerShape(CornerRadiusSmall))
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         if (icon != null) {

@@ -33,25 +33,75 @@ import androidx.navigation.compose.rememberNavController
 import coil.Coil
 import coil.ImageLoader
 import coil.disk.DiskCache
-import com.codershubinc.aaxion_mob.auth.TokenManager
-import com.codershubinc.aaxion_mob.ui.AaxionDriveScreen
-import com.codershubinc.aaxion_mob.ui.LoginScreen
+import okhttp3.OkHttpClient
+import com.codershubinc.aaxion_mob.core.data.DataStoreManager
+import com.codershubinc.aaxion_mob.core.data.TokenManager
+import com.codershubinc.aaxion_mob.core.model.AccentTheme
+import com.codershubinc.aaxion_mob.core.model.IconPackTheme
+import com.codershubinc.aaxion_mob.core.network.ServerDiscovery
+import com.codershubinc.aaxion_mob.feature.auth.LoginScreen
+import com.codershubinc.aaxion_mob.feature.drive.AaxionDriveScreen
+import com.codershubinc.aaxion_mob.feature.drive.FileViewModel
+import com.codershubinc.aaxion_mob.feature.settings.ConnectionManagerScreen
+import com.codershubinc.aaxion_mob.feature.settings.SettingsScreen
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import com.codershubinc.aaxion_mob.ui.theme.AaxionMobTheme
 import com.codershubinc.aaxion_mob.ui.theme.AaxionPrimary
-import com.codershubinc.aaxion_mob.utils.DataStoreManager
-import com.codershubinc.aaxion_mob.utils.ServerDiscovery
-import com.codershubinc.aaxion_mob.viewmodels.FileViewModel
+import com.codershubinc.aaxion_mob.ui.theme.LocalAccentColor
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.combine
 
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        var isStatusBarHiddenCached: Boolean = false
+            internal set
+        var isNavBarHiddenCached: Boolean = false
+            internal set
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        updateSystemBars()
+        applySystemBars()
+
+        lifecycleScope.launch {
+            val dataStoreManager = DataStoreManager(this@MainActivity)
+            dataStoreManager.hideStatusBar.collect { hidden ->
+                isStatusBarHiddenCached = hidden
+                applySystemBars()
+            }
+        }
+        lifecycleScope.launch {
+            val dataStoreManager = DataStoreManager(this@MainActivity)
+            dataStoreManager.hideNavigationBar.collect { hidden ->
+                isNavBarHiddenCached = hidden
+                applySystemBars()
+            }
+        }
+
+        val coilOkHttpClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request()
+                val token = TokenManager.getInstance(applicationContext).accessTokenState.value
+                val newRequest = if (!token.isNullOrBlank()) {
+                    request.newBuilder()
+                        .header("Authorization", "Bearer $token")
+                        .build()
+                } else {
+                    request
+                }
+                chain.proceed(newRequest)
+            }
+            .build()
+
         val imageLoader = ImageLoader.Builder(this)
+            .okHttpClient(coilOkHttpClient)
             .diskCache {
                 DiskCache.Builder()
                     .directory(this.cacheDir.resolve("image_cache"))
@@ -66,12 +116,21 @@ class MainActivity : ComponentActivity() {
             val dataStoreManager = remember { DataStoreManager(context) }
             val savedAccentId by dataStoreManager.accentTheme.collectAsState(initial = null)
             val savedIconPackId by dataStoreManager.iconPackTheme.collectAsState(initial = null)
+            val hideStatusBar by dataStoreManager.hideStatusBar.collectAsState(initial = isStatusBarHiddenCached)
+            val hideNavBar by dataStoreManager.hideNavigationBar.collectAsState(initial = isNavBarHiddenCached)
+
+            val window = (context as? ComponentActivity)?.window
+            LaunchedEffect(hideStatusBar, hideNavBar, window) {
+                isStatusBarHiddenCached = hideStatusBar
+                isNavBarHiddenCached = hideNavBar
+                applySystemBars()
+            }
 
             val activeAccent = remember(savedAccentId) {
-                com.codershubinc.aaxion_mob.models.AccentTheme.fromId(savedAccentId)
+                AccentTheme.fromId(savedAccentId)
             }
             val activeIconPack = remember(savedIconPackId) {
-                com.codershubinc.aaxion_mob.models.IconPackTheme.fromId(savedIconPackId)
+                IconPackTheme.fromId(savedIconPackId)
             }
 
             AaxionMobTheme(
@@ -86,43 +145,29 @@ class MainActivity : ComponentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
-            updateSystemBars()
+            applySystemBars()
         }
     }
 
-    private fun updateSystemBars() {
-        lifecycleScope.launch {
-            val context = this@MainActivity
-            val dataStoreManager = DataStoreManager(context)
-            val hideStatusBar = dataStoreManager.hideStatusBar.first()
-            val hideNavBar = dataStoreManager.hideNavigationBar.first()
+    private fun applySystemBars() {
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
-            val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-            insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-
-            var hideTypes = 0
-            if (hideStatusBar) {
-                hideTypes = hideTypes or WindowInsetsCompat.Type.statusBars()
-            }
-            if (hideNavBar) {
-                hideTypes = hideTypes or WindowInsetsCompat.Type.navigationBars()
-            }
-
-            var showTypes = 0
-            if (!hideStatusBar) {
-                showTypes = showTypes or WindowInsetsCompat.Type.statusBars()
-            }
-            if (!hideNavBar) {
-                showTypes = showTypes or WindowInsetsCompat.Type.navigationBars()
-            }
-
-            if (hideTypes != 0) {
-                insetsController.hide(hideTypes)
-            }
-            if (showTypes != 0) {
-                insetsController.show(showTypes)
-            }
+        var hideTypes = 0
+        var showTypes = 0
+        if (isStatusBarHiddenCached) {
+            hideTypes = hideTypes or WindowInsetsCompat.Type.statusBars()
+        } else {
+            showTypes = showTypes or WindowInsetsCompat.Type.statusBars()
         }
+        if (isNavBarHiddenCached) {
+            hideTypes = hideTypes or WindowInsetsCompat.Type.navigationBars()
+        } else {
+            showTypes = showTypes or WindowInsetsCompat.Type.navigationBars()
+        }
+
+        if (hideTypes != 0) insetsController.hide(hideTypes)
+        if (showTypes != 0) insetsController.show(showTypes)
     }
 }
 
@@ -195,13 +240,41 @@ fun AppNavigation() {
     val isLoggedIn = !activeAccessToken.isNullOrBlank() && !activeMasterToken.isNullOrBlank()
     val startDestination = if (isLoggedIn) "drive" else "login"
 
+    val safePopBackStack: () -> Unit = {
+        if (navController.currentBackStackEntry?.lifecycle?.currentState == Lifecycle.State.RESUMED) {
+            navController.popBackStack()
+        }
+    }
+
     NavHost(
-        navController = navController, 
+        navController = navController,
         startDestination = startDestination,
-        enterTransition = { androidx.compose.animation.EnterTransition.None },
-        exitTransition = { androidx.compose.animation.ExitTransition.None },
-        popEnterTransition = { androidx.compose.animation.EnterTransition.None },
-        popExitTransition = { androidx.compose.animation.ExitTransition.None }
+        enterTransition = {
+            slideIntoContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                animationSpec = tween(240, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(180))
+        },
+        exitTransition = {
+            slideOutOfContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                targetOffset = { it / 4 },
+                animationSpec = tween(240, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(150))
+        },
+        popEnterTransition = {
+            slideIntoContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.End,
+                initialOffset = { it / 4 },
+                animationSpec = tween(240, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(180))
+        },
+        popExitTransition = {
+            slideOutOfContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.End,
+                animationSpec = tween(220, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(150))
+        }
     ) {
         composable("login") {
             LoginScreen(
@@ -220,6 +293,7 @@ fun AppNavigation() {
                 tunnelUri = savedTunnelUri,
                 token = activeAccessToken ?: "",
                 viewModel = fileViewModel,
+                prioritizedServerUris = prioritizedServerUris,
                 discoveredUris = discoveredServerUris.toList(),
                 onLogout = {
                     scope.launch {
@@ -229,7 +303,13 @@ fun AppNavigation() {
                         }
                     }
                 },
-                onNavigateToConnectionManager = { navController.navigate("connection_manager") }
+                onNavigateToConnectionManager = {
+                    if (navController.currentBackStackEntry?.lifecycle?.currentState == Lifecycle.State.RESUMED) {
+                        navController.navigate("connection_manager") {
+                            launchSingleTop = true
+                        }
+                    }
+                }
             )
         }
 
@@ -240,6 +320,7 @@ fun AppNavigation() {
                 tunnelUri = savedTunnelUri,
                 token = activeAccessToken ?: "",
                 viewModel = fileViewModel,
+                prioritizedServerUris = prioritizedServerUris,
                 discoveredUris = discoveredServerUris.toList(),
                 onLogout = {
                     scope.launch {
@@ -249,7 +330,13 @@ fun AppNavigation() {
                         }
                     }
                 },
-                onNavigateToConnectionManager = { navController.navigate("connection_manager") }
+                onNavigateToConnectionManager = {
+                    if (navController.currentBackStackEntry?.lifecycle?.currentState == Lifecycle.State.RESUMED) {
+                        navController.navigate("connection_manager") {
+                            launchSingleTop = true
+                        }
+                    }
+                }
             )
         }
 
@@ -259,6 +346,7 @@ fun AppNavigation() {
                 tunnelUri = savedTunnelUri,
                 token = activeAccessToken ?: "",
                 viewModel = fileViewModel,
+                prioritizedServerUris = prioritizedServerUris,
                 discoveredUris = discoveredServerUris.toList(),
                 onLogout = {
                     scope.launch {
@@ -268,15 +356,47 @@ fun AppNavigation() {
                         }
                     }
                 },
-                onNavigateToConnectionManager = { navController.navigate("connection_manager") }
+                onNavigateToConnectionManager = {
+                    if (navController.currentBackStackEntry?.lifecycle?.currentState == Lifecycle.State.RESUMED) {
+                        navController.navigate("connection_manager") {
+                            launchSingleTop = true
+                        }
+                    }
+                }
+            )
+        }
+
+        composable("settings") {
+            SettingsScreen(
+                serverUri = activeServerUri,
+                token = activeAccessToken ?: "",
+                onBackClick = safePopBackStack,
+                onLogout = {
+                    scope.launch {
+                        tokenManager.clearSession()
+                        navController.navigate("login") {
+                            popUpTo("drive") { inclusive = true }
+                        }
+                    }
+                },
+                onNavigateToConnectionManager = {
+                    if (navController.currentBackStackEntry?.lifecycle?.currentState == Lifecycle.State.RESUMED) {
+                        navController.navigate("connection_manager") {
+                            launchSingleTop = true
+                        }
+                    }
+                },
+                wrapWithBackground = true
             )
         }
 
         composable("connection_manager") {
-            com.codershubinc.aaxion_mob.ui.ConnectionManagerScreen(
+            ConnectionManagerScreen(
                 discoveredUris = discoveredServerUris.toList(),
                 currentActiveUri = activeServerUri,
-                onBackClick = { navController.popBackStack() },
+                initialPrioritizedUris = prioritizedServerUris,
+                initialTunnelUri = savedTunnelUri,
+                onBackClick = safePopBackStack,
                 onRefresh = {
                     discoveredServerUris.clear()
                     refreshDiscovery.value += 1
@@ -308,6 +428,8 @@ fun AaxionSplashScreen() {
         label = "scale"
     )
 
+    val accentColor = LocalAccentColor.current
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -322,10 +444,10 @@ fun AaxionSplashScreen() {
                     .size(76.dp)
                     .scale(scale)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(AaxionPrimary.copy(alpha = 0.12f * alpha))
+                    .background(accentColor.copy(alpha = 0.12f * alpha))
                     .border(
                         width = 1.5.dp,
-                        color = AaxionPrimary.copy(alpha = 0.6f * alpha),
+                        color = accentColor.copy(alpha = 0.6f * alpha),
                         shape = RoundedCornerShape(20.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -333,7 +455,7 @@ fun AaxionSplashScreen() {
                 Icon(
                     imageVector = Icons.Default.CloudQueue,
                     contentDescription = null,
-                    tint = AaxionPrimary.copy(alpha = alpha),
+                    tint = accentColor.copy(alpha = alpha),
                     modifier = Modifier.size(38.dp)
                 )
             }

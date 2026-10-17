@@ -77,6 +77,18 @@ object ApiEndpoints {
         const val GET_ROOT_PATH = "/api/v1/system/root-path"
         const val STORAGE = "/api/v1/system/storage"
     }
+
+    // ==========================================
+    // Music
+    // ==========================================
+    object MUSIC {
+        const val LIST = "/api/v1/music"
+        const val GET = "/api/v1/music/get"
+        const val SEARCH = "/api/v1/music/search"
+        const val ADD = "/api/v1/music/add"
+        const val UPDATE = "/api/v1/music/update"
+        const val STREAM = "/api/v1/music/stream"
+    }
 }
 
 typealias API_ENDPOINTS = ApiEndpoints

@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.PowerManager
 import android.view.Surface
 import com.codershubinc.aaxion_mob.core.model.FileItem
+import com.codershubinc.aaxion_mob.core.model.MusicTrack
+import com.codershubinc.aaxion_mob.core.network.AaxionUrlBuilder
 import com.codershubinc.aaxion_mob.core.network.buildImageViewUrl
 import com.codershubinc.aaxion_mob.core.network.buildStreamUrl
 import com.codershubinc.aaxion_mob.core.network.buildThumbUrl
@@ -37,7 +39,11 @@ data class MediaPlaybackState(
     val isVisible: Boolean = false,
     val errorMessage: String? = null,
     val queueSize: Int = 0,
-    val queueIndex: Int = -1
+    val queueIndex: Int = -1,
+    val displayTitle: String? = null,
+    val displayArtist: String? = null,
+    val displayAlbum: String? = null,
+    val musicTrackId: Long? = null
 ) {
     val progressFraction: Float
         get() = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
@@ -120,6 +126,7 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
     private var progressJob: Job? = null
 
     private var activeQueue: List<FileItem> = emptyList()
+    private var activeMusicQueue: List<MusicTrack>? = null
     private var activeQueueIndex: Int = -1
     private var activeBaseUrl: String? = null
     private var activeToken: String? = null
@@ -159,14 +166,19 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
         isVideo: Boolean = file.isVideo,
         token: String? = null,
         baseUrl: String? = null,
-        siblingFiles: List<FileItem>? = null
+        siblingFiles: List<FileItem>? = null,
+        artworkUrlOverride: String? = null,
+        displayTitle: String? = null,
+        displayArtist: String? = null,
+        displayAlbum: String? = null,
+        musicTrackId: Long? = null
     ) {
         scope.launch {
             stopAndResetPlayer()
 
             val effectiveBaseUrl = baseUrl ?: extractBaseUrl(streamUrl)
             val effectiveToken = token ?: extractToken(streamUrl)
-            val resolvedArt = if (effectiveBaseUrl.isNotEmpty()) {
+            val resolvedArt = artworkUrlOverride ?: if (effectiveBaseUrl.isNotEmpty()) {
                 ArtworkResolver.findArtworkUrl(file, siblingFiles, effectiveBaseUrl, effectiveToken)
             } else null
 
@@ -185,7 +197,11 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
                     videoHeight = 0,
                     isExpanded = isVideo,
                     isVisible = true,
-                    errorMessage = null
+                    errorMessage = null,
+                    displayTitle = displayTitle,
+                    displayArtist = displayArtist,
+                    displayAlbum = displayAlbum,
+                    musicTrackId = musicTrackId
                 )
             }
 
@@ -358,6 +374,78 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
     }
 
     /**
+     * Starts playback for a single server-indexed MusicTrack.
+     */
+    fun playMusicTrack(
+        track: MusicTrack,
+        token: String,
+        baseUrl: String
+    ) {
+        activeMusicQueue = null
+        activeQueue = emptyList()
+        val fileItem = track.toFileItem()
+        val streamUrl = AaxionUrlBuilder.buildMusicStreamUrl(baseUrl, track.id, token)
+        val artworkUrl = if (track.imagePath.isNotBlank()) {
+            AaxionUrlBuilder.buildMusicArtworkUrl(baseUrl, track.imagePath, token)
+        } else null
+
+        play(
+            file = fileItem,
+            streamUrl = streamUrl,
+            isVideo = false,
+            token = token,
+            baseUrl = baseUrl,
+            artworkUrlOverride = artworkUrl,
+            displayTitle = track.displayTitle,
+            displayArtist = track.displayArtist,
+            displayAlbum = track.album,
+            musicTrackId = track.id
+        )
+    }
+
+    /**
+     * Starts queue playback for a list of server-indexed MusicTracks with optional shuffle.
+     */
+    fun playMusicQueue(
+        tracks: List<MusicTrack>,
+        startIndex: Int = 0,
+        shuffle: Boolean = false,
+        token: String,
+        baseUrl: String
+    ) {
+        if (tracks.isEmpty()) return
+        val queue = if (shuffle) tracks.shuffled() else tracks
+        activeMusicQueue = queue
+        activeQueue = emptyList()
+        activeBaseUrl = baseUrl
+        activeToken = token
+        activeSiblingFiles = null
+        val idx = startIndex.coerceIn(0, queue.size - 1)
+        activeQueueIndex = idx
+        _state.update { it.copy(isShuffle = shuffle, queueSize = queue.size, queueIndex = idx) }
+
+        val target = queue[idx]
+        val fileItem = target.toFileItem()
+        val streamUrl = AaxionUrlBuilder.buildMusicStreamUrl(baseUrl, target.id, token)
+        val artworkUrl = if (target.imagePath.isNotBlank()) {
+            AaxionUrlBuilder.buildMusicArtworkUrl(baseUrl, target.imagePath, token)
+        } else null
+
+        play(
+            file = fileItem,
+            streamUrl = streamUrl,
+            isVideo = false,
+            token = token,
+            baseUrl = baseUrl,
+            artworkUrlOverride = artworkUrl,
+            displayTitle = target.displayTitle,
+            displayArtist = target.displayArtist,
+            displayAlbum = target.album,
+            musicTrackId = target.id
+        )
+    }
+
+    /**
      * Starts playback for a list of tracks with optional shuffle.
      * Automatically sets the active queue and starts with startIndex.
      */
@@ -371,6 +459,7 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
     ) {
         if (tracks.isEmpty()) return
         val queue = if (shuffle) tracks.shuffled() else tracks
+        activeMusicQueue = null
         activeQueue = queue
         activeBaseUrl = baseUrl
         activeToken = token
@@ -393,6 +482,40 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
     }
 
     fun playNext() {
+        if (!activeMusicQueue.isNullOrEmpty()) {
+            val mQueue = activeMusicQueue!!
+            val nextIdx = if (activeQueueIndex + 1 < mQueue.size) {
+                activeQueueIndex + 1
+            } else if (_state.value.isLooping) {
+                0
+            } else return
+
+            activeQueueIndex = nextIdx
+            _state.update { it.copy(queueIndex = nextIdx) }
+            val target = mQueue[nextIdx]
+            val effectiveBase = activeBaseUrl ?: ""
+            val effectiveTkn = activeToken ?: ""
+            val fileItem = target.toFileItem()
+            val streamUrl = AaxionUrlBuilder.buildMusicStreamUrl(effectiveBase, target.id, effectiveTkn)
+            val artworkUrl = if (target.imagePath.isNotBlank()) {
+                AaxionUrlBuilder.buildMusicArtworkUrl(effectiveBase, target.imagePath, effectiveTkn)
+            } else null
+
+            play(
+                file = fileItem,
+                streamUrl = streamUrl,
+                isVideo = false,
+                token = effectiveTkn,
+                baseUrl = effectiveBase,
+                artworkUrlOverride = artworkUrl,
+                displayTitle = target.displayTitle,
+                displayArtist = target.displayArtist,
+                displayAlbum = target.album,
+                musicTrackId = target.id
+            )
+            return
+        }
+
         if (activeQueue.isEmpty()) return
         val nextIdx = if (activeQueueIndex + 1 < activeQueue.size) {
             activeQueueIndex + 1
@@ -417,6 +540,43 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
     }
 
     fun playPrevious() {
+        if (!activeMusicQueue.isNullOrEmpty()) {
+            if (_state.value.currentPositionMs > 3000L) {
+                seekTo(0L)
+                return
+            }
+            val mQueue = activeMusicQueue!!
+            val prevIdx = if (activeQueueIndex - 1 >= 0) {
+                activeQueueIndex - 1
+            } else {
+                0
+            }
+            activeQueueIndex = prevIdx
+            _state.update { it.copy(queueIndex = prevIdx) }
+            val target = mQueue[prevIdx]
+            val effectiveBase = activeBaseUrl ?: ""
+            val effectiveTkn = activeToken ?: ""
+            val fileItem = target.toFileItem()
+            val streamUrl = AaxionUrlBuilder.buildMusicStreamUrl(effectiveBase, target.id, effectiveTkn)
+            val artworkUrl = if (target.imagePath.isNotBlank()) {
+                AaxionUrlBuilder.buildMusicArtworkUrl(effectiveBase, target.imagePath, effectiveTkn)
+            } else null
+
+            play(
+                file = fileItem,
+                streamUrl = streamUrl,
+                isVideo = false,
+                token = effectiveTkn,
+                baseUrl = effectiveBase,
+                artworkUrlOverride = artworkUrl,
+                displayTitle = target.displayTitle,
+                displayArtist = target.displayArtist,
+                displayAlbum = target.album,
+                musicTrackId = target.id
+            )
+            return
+        }
+
         if (activeQueue.isEmpty()) return
         if (_state.value.currentPositionMs > 3000L) {
             seekTo(0L)
@@ -443,9 +603,15 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
         )
     }
 
-    fun hasNextTrack(): Boolean = activeQueue.isNotEmpty() && (activeQueueIndex + 1 < activeQueue.size || _state.value.isLooping)
+    fun hasNextTrack(): Boolean {
+        val size = activeMusicQueue?.size ?: activeQueue.size
+        return size > 0 && (activeQueueIndex + 1 < size || _state.value.isLooping)
+    }
 
-    fun hasPreviousTrack(): Boolean = activeQueue.isNotEmpty() && activeQueueIndex > 0
+    fun hasPreviousTrack(): Boolean {
+        val size = activeMusicQueue?.size ?: activeQueue.size
+        return size > 0 && activeQueueIndex > 0
+    }
 
     private fun applyPlaybackSpeed(player: MediaPlayer, speed: Float) {
         try {

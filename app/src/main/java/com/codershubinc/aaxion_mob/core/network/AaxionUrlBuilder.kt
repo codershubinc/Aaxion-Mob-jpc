@@ -49,6 +49,22 @@ object AaxionUrlBuilder {
             "$clean/api/v1/images/view?path=$encoded"
         }
     }
+
+    fun buildMusicStreamUrl(baseUrl: String, trackId: Long, token: String): String {
+        val clean = cleanBaseUrl(baseUrl)
+        return "$clean/api/v1/music/stream?id=$trackId&tkn=$token"
+    }
+
+    fun buildMusicArtworkUrl(baseUrl: String, imagePath: String, token: String = ""): String {
+        if (imagePath.isBlank()) return ""
+        val clean = cleanBaseUrl(baseUrl)
+        val encoded = encodePath(imagePath)
+        return if (token.isNotEmpty()) {
+            "$clean/api/v1/images/view?path=$encoded&tkn=$token"
+        } else {
+            "$clean/api/v1/images/view?path=$encoded"
+        }
+    }
 }
 
 fun FileItem.buildStreamUrl(baseUrl: String, token: String): String =
@@ -62,3 +78,10 @@ fun FileItem.buildThumbUrl(baseUrl: String, token: String = ""): String =
 
 fun FileItem.buildImageViewUrl(baseUrl: String, token: String = ""): String =
     AaxionUrlBuilder.buildImageViewUrl(baseUrl, rawPath, token)
+
+fun com.codershubinc.aaxion_mob.core.model.MusicTrack.buildStreamUrl(baseUrl: String, token: String): String =
+    AaxionUrlBuilder.buildMusicStreamUrl(baseUrl, id, token)
+
+fun com.codershubinc.aaxion_mob.core.model.MusicTrack.buildArtworkUrl(baseUrl: String, token: String = ""): String =
+    AaxionUrlBuilder.buildMusicArtworkUrl(baseUrl, imagePath, token)
+

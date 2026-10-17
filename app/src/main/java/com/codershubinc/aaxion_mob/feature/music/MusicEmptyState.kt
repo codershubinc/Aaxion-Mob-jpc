@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Headphones
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,8 +26,9 @@ import com.codershubinc.aaxion_mob.ui.theme.*
 
 @Composable
 fun MusicEmptyState(
-    currentPath: String,
-    onNavigateToMusicFolder: () -> Unit,
+    currentPath: String = "",
+    onAddTrackFromYouTube: (() -> Unit)? = null,
+    onNavigateToMusicFolder: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -67,9 +68,9 @@ fun MusicEmptyState(
             Spacer(modifier = Modifier.height(18.dp))
 
             Text(
-                text = "No Audio Tracks Found",
+                text = "Your Music Library is Empty",
                 color = TextPrimary,
-                fontSize = 16.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
@@ -77,38 +78,73 @@ fun MusicEmptyState(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "No music files (.mp3, .flac, .wav, .m4a) were found in '$currentPath'. Switch to your music folder to play songs.",
+                text = "Add YouTube songs or playlists directly to your server library, or stream audio files from your drive folders.",
                 color = TextSecondary,
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center,
                 lineHeight = 17.sp
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Quick shortcut to jump to standard Music folder
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(GlassSurfaceMedium)
-                    .border(0.8.dp, StreamerGreen.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
-                    .clickable(onClick = onNavigateToMusicFolder)
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = null,
-                        tint = StreamerGreen,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Browse Music Folder",
-                        color = StreamerGreen,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+            if (onAddTrackFromYouTube != null) {
+                // Primary Add Song Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(StreamerGreen, Color(0xFF059669))
+                            )
+                        )
+                        .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                        .clickable(onClick = onAddTrackFromYouTube)
+                        .padding(horizontal = 18.dp, vertical = 11.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = Color.Black,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Add Song from YouTube",
+                            color = Color.Black,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            if (onNavigateToMusicFolder != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                // Secondary shortcut to browse drive folder
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(GlassSurfaceMedium)
+                        .border(0.8.dp, GlassHairline, RoundedCornerShape(12.dp))
+                        .clickable(onClick = onNavigateToMusicFolder)
+                        .padding(horizontal = 16.dp, vertical = 9.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Browse Drive Files",
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }

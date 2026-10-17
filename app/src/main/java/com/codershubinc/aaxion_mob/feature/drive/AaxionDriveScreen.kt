@@ -231,6 +231,7 @@ fun AaxionDriveScreen(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
+                            tokenManager = tokenManager,
                             isSidebarVisible = isSidebarVisible,
                             onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
                             isTablet = true
@@ -398,6 +399,7 @@ fun AaxionDriveScreen(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
+                            tokenManager = tokenManager,
                             isSidebarVisible = isSidebarVisible,
                             onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
                             isTablet = false

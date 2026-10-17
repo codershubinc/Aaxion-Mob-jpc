@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -30,7 +31,8 @@ fun MusicHeaderActions(
     onSearchQueryChange: (String) -> Unit,
     onShuffleAll: () -> Unit,
     onPlayAll: () -> Unit,
-    currentPath: String,
+    currentPath: String = "",
+    onAddTrack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -41,7 +43,7 @@ fun MusicHeaderActions(
         // Hero Play Actions Row
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // "Shuffle All" primary button (User's core everyday action)
@@ -119,6 +121,38 @@ fun MusicHeaderActions(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
+                }
+            }
+
+            if (onAddTrack != null) {
+                Box(
+                    modifier = Modifier
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(StreamerGreen.copy(alpha = 0.18f))
+                        .border(0.8.dp, StreamerGreen.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .clickable(onClick = onAddTrack)
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Track",
+                            tint = StreamerGreen,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Add",
+                            color = StreamerGreen,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

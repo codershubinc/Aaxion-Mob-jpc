@@ -38,4 +38,36 @@ interface ApiService {
     suspend fun getStorageInfo(
         @Header("Authorization") token: String
     ): Response<StorageInfoResponse>
+
+    // ==========================================
+    // Music Endpoints
+    // ==========================================
+    @GET(ApiEndpoints.MUSIC.LIST)
+    suspend fun getMusicTracks(
+        @Header("Authorization") token: String
+    ): Response<List<com.codershubinc.aaxion_mob.core.model.MusicTrack>>
+
+    @GET(ApiEndpoints.MUSIC.GET)
+    suspend fun getMusicTrackById(
+        @Query("id") id: Long,
+        @Header("Authorization") token: String
+    ): Response<com.codershubinc.aaxion_mob.core.model.MusicTrack>
+
+    @GET(ApiEndpoints.MUSIC.SEARCH)
+    suspend fun searchMusicTracks(
+        @Query("title") title: String,
+        @Header("Authorization") token: String
+    ): Response<List<com.codershubinc.aaxion_mob.core.model.MusicTrack>>
+
+    @POST(ApiEndpoints.MUSIC.ADD)
+    suspend fun addMusicTrack(
+        @Query("uri") uri: String,
+        @Header("Authorization") token: String
+    ): Response<com.codershubinc.aaxion_mob.core.model.AddTrackResponse>
+
+    @PUT(ApiEndpoints.MUSIC.UPDATE)
+    suspend fun updateMusicTrack(
+        @Body track: com.codershubinc.aaxion_mob.core.model.UpdateTrackRequest,
+        @Header("Authorization") token: String
+    ): Response<com.codershubinc.aaxion_mob.core.model.MusicTrack>
 }

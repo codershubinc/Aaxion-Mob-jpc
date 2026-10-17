@@ -164,13 +164,14 @@ class AaxionMediaSessionManager(private val appContext: Context) {
     }
 
     private fun pushMetadata(state: MediaPlaybackState, artworkBitmap: Bitmap?) {
-        val fileName = state.currentFile?.name ?: "Media"
-        val subtitle = if (state.isVideo) "Aaxion Video" else "Aaxion Audio"
+        val fileName = state.displayTitle ?: state.currentFile?.name ?: "Media"
+        val subtitle = state.displayArtist ?: if (state.isVideo) "Aaxion Video" else "Aaxion Audio"
+        val album = state.displayAlbum ?: "Aaxion Library"
 
         val metaBuilder = MediaMetadata.Builder()
             .putString(MediaMetadata.METADATA_KEY_TITLE, fileName)
             .putString(MediaMetadata.METADATA_KEY_ARTIST, subtitle)
-            .putString(MediaMetadata.METADATA_KEY_ALBUM, "Aaxion Drive")
+            .putString(MediaMetadata.METADATA_KEY_ALBUM, album)
             .putLong(MediaMetadata.METADATA_KEY_DURATION, state.durationMs)
 
         if (artworkBitmap != null) {
@@ -186,8 +187,8 @@ class AaxionMediaSessionManager(private val appContext: Context) {
     }
 
     private fun postNotification(state: MediaPlaybackState, artworkBitmap: Bitmap?) {
-        val fileName = state.currentFile?.name ?: "Media"
-        val subtitle = if (state.isVideo) "Aaxion Video" else "Aaxion Audio"
+        val fileName = state.displayTitle ?: state.currentFile?.name ?: "Media"
+        val subtitle = state.displayArtist ?: if (state.isVideo) "Aaxion Video" else "Aaxion Audio"
 
         val openIntent = Intent(appContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP

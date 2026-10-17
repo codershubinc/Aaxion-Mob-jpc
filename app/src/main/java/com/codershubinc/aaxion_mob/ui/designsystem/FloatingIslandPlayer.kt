@@ -149,7 +149,7 @@ private fun CompactIslandView(
     onClose: () -> Unit
 ) {
     val islandShape = RoundedCornerShape(27.dp)
-    val fileName = state.currentFile?.name ?: "Media"
+    val fileName = state.displayTitle ?: state.currentFile?.name ?: "Media"
     val fileExt = state.currentFile?.extension?.uppercase() ?: ""
 
     Box(
@@ -407,7 +407,7 @@ private fun ExpandedIslandView(
     onOpenExternal: () -> Unit
 ) {
     val cardShape = RoundedCornerShape(26.dp)
-    val fileName = state.currentFile?.name ?: "Media"
+    val fileName = state.displayTitle ?: state.currentFile?.name ?: "Media"
     val isVideo = state.isVideo
 
     Box(
@@ -724,6 +724,17 @@ private fun ExpandedIslandView(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
+        if (!state.displayArtist.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = state.displayArtist,
+                color = accentColor,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
         Spacer(modifier = Modifier.height(6.dp))
 

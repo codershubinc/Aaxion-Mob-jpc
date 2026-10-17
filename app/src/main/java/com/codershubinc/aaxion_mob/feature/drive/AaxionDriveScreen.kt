@@ -115,24 +115,38 @@ fun AaxionDriveScreen(
     val playerManager = remember { MediaPlayerManager.getInstance(context) }
     val playerState by playerManager.state.collectAsState()
 
-    // Intercept system Back button: Close player if expanded, close sidebar drawer, return to Drive tab, or navigate back in dir tree
-    BackHandler(enabled = playerState.isExpanded || (isSidebarVisible && !isDesktop) || currentTab != 0 || (viewModel.currentPath != "/" && viewModel.currentPath.isNotEmpty())) {
-        if (playerState.isExpanded) {
-            playerManager.setExpanded(false)
-        } else if (isSidebarVisible && !isDesktop) {
-            isSidebarVisible = false
-        } else if (currentTab != 0) {
-            currentTab = 0
-        } else if (viewModel.currentPath != "/" && viewModel.currentPath.isNotEmpty()) {
-            viewModel.navigateUp(serverUri, effectiveToken, tokenManager = tokenManager)
-        }
-    }
-
     // Live server ping and latency
     var serverLatencyMs by remember { mutableStateOf<Long?>(null) }
     var isServerOnline by remember { mutableStateOf<Boolean?>(null) }
     var isLocalConnection by remember { mutableStateOf(true) }
     var activeServerUri by remember(serverUri) { mutableStateOf(serverUri) }
+
+    LaunchedEffect(serverUri) {
+        if (serverUri.isNotBlank()) {
+            activeServerUri = serverUri
+        }
+    }
+
+    // Intercept system Back button: Close player if expanded, close sidebar drawer, clear active search, return to Drive tab, or navigate back in dir tree
+    BackHandler(
+        enabled = playerState.isExpanded ||
+                (isSidebarVisible && !isDesktop) ||
+                viewModel.searchQuery.isNotBlank() ||
+                currentTab != 0 ||
+                viewModel.canNavigateUp
+    ) {
+        if (playerState.isExpanded) {
+            playerManager.setExpanded(false)
+        } else if (isSidebarVisible && !isDesktop) {
+            isSidebarVisible = false
+        } else if (viewModel.searchQuery.isNotBlank()) {
+            viewModel.searchQuery = ""
+        } else if (currentTab != 0) {
+            currentTab = 0
+        } else if (viewModel.canNavigateUp) {
+            viewModel.navigateUp(activeServerUri, effectiveToken, tokenManager = tokenManager)
+        }
+    }
 
     LaunchedEffect(prioritizedServerUris, discoveredUris, tunnelUri) {
         while (isActive) {
@@ -247,11 +261,11 @@ fun AaxionDriveScreen(
                                 if (!isDesktop) {
                                     isSidebarVisible = false
                                 }
-                                viewModel.navigateTo(serverUri, effectiveToken, targetPath, tokenManager = tokenManager)
+                                viewModel.navigateTo(activeServerUri, effectiveToken, targetPath, tokenManager = tokenManager)
                             },
                             onRefreshToken = {
                                 scope.launch {
-                                    val success = tokenManager.refreshAccessToken(serverUri)
+                                    val success = tokenManager.refreshAccessToken(activeServerUri)
                                     val msg = if (success) "Access token refreshed" else "Refresh failed"
                                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                 }
@@ -415,11 +429,11 @@ fun AaxionDriveScreen(
                                 if (!isDesktop) {
                                     isSidebarVisible = false
                                 }
-                                viewModel.navigateTo(serverUri, effectiveToken, targetPath, tokenManager = tokenManager)
+                                viewModel.navigateTo(activeServerUri, effectiveToken, targetPath, tokenManager = tokenManager)
                             },
                             onRefreshToken = {
                                 scope.launch {
-                                    val success = tokenManager.refreshAccessToken(serverUri)
+                                    val success = tokenManager.refreshAccessToken(activeServerUri)
                                     val msg = if (success) "Access token refreshed" else "Refresh failed"
                                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                 }
@@ -441,7 +455,7 @@ fun AaxionDriveScreen(
         Sidebar(
             isVisible = isSidebarVisible,
             isDesktop = isDesktop,
-            serverUri = serverUri,
+            serverUri = activeServerUri,
             activeServerUri = activeServerUri,
             effectiveToken = effectiveToken,
             prioritizedServerUris = prioritizedServerUris,
@@ -464,7 +478,7 @@ fun AaxionDriveScreen(
                 if (!isDesktop) {
                     isSidebarVisible = false
                 }
-                viewModel.navigateTo(serverUri, effectiveToken, targetPath, tokenManager = tokenManager)
+                viewModel.navigateTo(activeServerUri, effectiveToken, targetPath, tokenManager = tokenManager)
             }
         )
 

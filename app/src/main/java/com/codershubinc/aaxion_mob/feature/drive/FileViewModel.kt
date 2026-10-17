@@ -1,6 +1,7 @@
 package com.codershubinc.aaxion_mob.feature.drive
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -66,7 +67,13 @@ class FileViewModel : ViewModel() {
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
-    private val pathHistory = mutableListOf<String>()
+    val pathHistory = mutableStateListOf<String>()
+
+    val canNavigateUp: Boolean
+        get() = pathHistory.isNotEmpty() || (currentPath != "/" && currentPath.isNotEmpty())
+
+    private var lastBaseUrl: String = ""
+    private var lastToken: String = ""
 
     fun fetchFiles(
         baseUrl: String,
@@ -74,17 +81,23 @@ class FileViewModel : ViewModel() {
         path: String = "/",
         tokenManager: TokenManager? = null
     ) {
+        if (baseUrl.isNotBlank()) lastBaseUrl = baseUrl
+        if (token.isNotBlank()) lastToken = token
+
+        val effectiveBase = baseUrl.ifBlank { lastBaseUrl }
+        val effectiveTok = token.ifBlank { lastToken }
+
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
             try {
-                val apiService = Fetcher.getInstance().getService(baseUrl)
+                val apiService = Fetcher.getInstance().getService(effectiveBase)
                 val response = if (tokenManager != null) {
-                    tokenManager.withAuthRetry(baseUrl, token) { auth ->
+                    tokenManager.withAuthRetry(effectiveBase, effectiveTok) { auth ->
                         apiService.listFiles(path, "Bearer $auth")
                     }
                 } else {
-                    apiService.listFiles(path, "Bearer $token")
+                    apiService.listFiles(path, "Bearer $effectiveTok")
                 }
 
                 if (response.isSuccessful) {
@@ -108,7 +121,9 @@ class FileViewModel : ViewModel() {
         tokenManager: TokenManager? = null
     ) {
         if (currentPath != path) {
-            pathHistory.add(currentPath)
+            if (pathHistory.isEmpty() || pathHistory.last() != currentPath) {
+                pathHistory.add(currentPath)
+            }
             fetchFiles(baseUrl, token, path, tokenManager)
         }
     }
@@ -118,13 +133,20 @@ class FileViewModel : ViewModel() {
         token: String,
         tokenManager: TokenManager? = null
     ): Boolean {
+        while (pathHistory.isNotEmpty() && pathHistory.last() == currentPath) {
+            pathHistory.removeAt(pathHistory.size - 1)
+        }
+
+        val effectiveBase = baseUrl.ifBlank { lastBaseUrl }
+        val effectiveTok = token.ifBlank { lastToken }
+
         if (pathHistory.isNotEmpty()) {
             val previous = pathHistory.removeAt(pathHistory.size - 1)
-            fetchFiles(baseUrl, token, previous, tokenManager)
+            fetchFiles(effectiveBase, effectiveTok, previous, tokenManager)
             return true
         } else if (currentPath != "/" && currentPath.isNotEmpty()) {
             val parent = currentPath.substringBeforeLast("/", "").ifEmpty { "/" }
-            fetchFiles(baseUrl, token, parent, tokenManager)
+            fetchFiles(effectiveBase, effectiveTok, parent, tokenManager)
             return true
         }
         return false

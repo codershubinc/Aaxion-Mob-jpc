@@ -240,7 +240,7 @@ class AaxionMediaSessionManager(private val appContext: Context) {
         }
 
         notifBuilder
-            .setSmallIcon(R.drawable.aaxion_logo)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(fileName)
             .setContentText(subtitle)
             .setContentIntent(openPending)
@@ -291,7 +291,7 @@ class AaxionMediaSessionManager(private val appContext: Context) {
         try {
             notificationManager.notify(NOTIFICATION_ID, notifBuilder.build())
         } catch (e: SecurityException) {
-            // POST_NOTIFICATIONS permission not granted
+            // Permission not granted
         } catch (e: Exception) {
             // ignore notification dispatch issues
         }
@@ -310,6 +310,16 @@ class AaxionMediaSessionManager(private val appContext: Context) {
             if (mediaSession.isActive) {
                 mediaSession.isActive = false
             }
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    fun release() {
+        clear()
+        scope.cancel()
+        try {
+            mediaSession.release()
         } catch (e: Exception) {
             // ignore
         }

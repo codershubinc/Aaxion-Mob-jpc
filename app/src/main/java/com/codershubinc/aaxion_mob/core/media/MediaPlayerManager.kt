@@ -713,4 +713,9 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
             mediaPlayer = null
         }
     }
+
+    fun release() {
+        close()
+        sessionManager.release()
+    }
 }

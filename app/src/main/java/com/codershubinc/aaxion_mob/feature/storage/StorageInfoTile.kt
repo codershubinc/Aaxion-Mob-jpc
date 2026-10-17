@@ -30,6 +30,7 @@ import com.codershubinc.aaxion_mob.core.model.StorageInfoResponse
 import com.codershubinc.aaxion_mob.core.network.Fetcher
 import com.codershubinc.aaxion_mob.core.util.IntentUtils
 import com.codershubinc.aaxion_mob.ui.designsystem.AaxionCard
+import com.codershubinc.aaxion_mob.ui.designsystem.InsetGroupedGlassCard
 import com.codershubinc.aaxion_mob.ui.theme.*
 import java.util.Locale
 
@@ -78,12 +79,11 @@ fun StorageInfoTile(
     val info = storageInfo
     val error = errorMessage
 
-    AaxionCard(
-        modifier = modifier.fillMaxWidth(),
-        backgroundColor = AaxionSurfaceVariant,
-        borderColor = AaxionBorder
+    InsetGroupedGlassCard(
+        modifier = modifier.fillMaxWidth()
     ) {
-        Row(
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -475,4 +475,5 @@ fun StorageInfoTile(
             }
         }
     }
+}
 }

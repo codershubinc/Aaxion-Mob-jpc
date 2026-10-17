@@ -1,6 +1,5 @@
 package com.codershubinc.aaxion_mob.feature.drive
 
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -9,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.codershubinc.aaxion_mob.core.data.TokenManager
 import com.codershubinc.aaxion_mob.core.model.FileItem
 import com.codershubinc.aaxion_mob.core.network.Fetcher
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 enum class FileCategory {
@@ -22,8 +22,40 @@ enum class SortField(val displayName: String) {
 }
 
 class FileViewModel : ViewModel() {
-    var files by mutableStateOf<List<FileItem>>(emptyList())
-        private set
+    private val _files = MutableStateFlow<List<FileItem>>(emptyList())
+    val filesFlow: StateFlow<List<FileItem>> = _files.asStateFlow()
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQueryFlow: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _selectedCategory = MutableStateFlow(FileCategory.ALL)
+    val selectedCategoryFlow: StateFlow<FileCategory> = _selectedCategory.asStateFlow()
+
+    private val _sortField = MutableStateFlow(SortField.NAME)
+    val sortFieldFlow: StateFlow<SortField> = _sortField.asStateFlow()
+
+    private val _sortAscending = MutableStateFlow(true)
+    val sortAscendingFlow: StateFlow<Boolean> = _sortAscending.asStateFlow()
+
+    var files: List<FileItem>
+        get() = _files.value
+        private set(value) { _files.value = value }
+
+    var searchQuery: String
+        get() = _searchQuery.value
+        set(value) { _searchQuery.value = value }
+
+    var selectedCategory: FileCategory
+        get() = _selectedCategory.value
+        set(value) { _selectedCategory.value = value }
+
+    var sortField: SortField
+        get() = _sortField.value
+        set(value) { _sortField.value = value }
+
+    var sortAscending: Boolean
+        get() = _sortAscending.value
+        set(value) { _sortAscending.value = value }
 
     var currentPath by mutableStateOf("/")
         private set
@@ -33,11 +65,6 @@ class FileViewModel : ViewModel() {
 
     var errorMessage by mutableStateOf<String?>(null)
         private set
-
-    var searchQuery by mutableStateOf("")
-    var selectedCategory by mutableStateOf(FileCategory.ALL)
-    var sortField by mutableStateOf(SortField.NAME)
-    var sortAscending by mutableStateOf(true)
 
     private val pathHistory = mutableListOf<String>()
 
@@ -103,13 +130,68 @@ class FileViewModel : ViewModel() {
         return false
     }
 
-    val filteredFiles: List<FileItem> by derivedStateOf {
-        var result = files
-        if (searchQuery.isNotBlank()) {
-            result = result.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    val filteredFilesFlow: StateFlow<List<FileItem>> = combine(
+        _files,
+        _searchQuery,
+        _selectedCategory,
+        _sortField,
+        _sortAscending
+    ) { filesList, query, category, field, ascending ->
+        filterAndSortFiles(filesList, query, category, field, ascending)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val streamableMediaFlow: StateFlow<List<FileItem>> = _files.map { list ->
+        list.filter { it.isVideo || it.isAudio }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val streamableVideosFlow: StateFlow<List<FileItem>> = _files.map { list ->
+        list.filter { it.isVideo }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val streamableAudioFlow: StateFlow<List<FileItem>> = _files.map { list ->
+        list.filter { it.isAudio }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val _filteredFiles = mutableStateOf<List<FileItem>>(emptyList())
+    val filteredFiles: List<FileItem> by _filteredFiles
+
+    private val _streamableMedia = mutableStateOf<List<FileItem>>(emptyList())
+    val streamableMedia: List<FileItem> by _streamableMedia
+
+    private val _streamableVideos = mutableStateOf<List<FileItem>>(emptyList())
+    val streamableVideos: List<FileItem> by _streamableVideos
+
+    private val _streamableAudio = mutableStateOf<List<FileItem>>(emptyList())
+    val streamableAudio: List<FileItem> by _streamableAudio
+
+    init {
+        viewModelScope.launch {
+            filteredFilesFlow.collect { _filteredFiles.value = it }
+        }
+        viewModelScope.launch {
+            streamableMediaFlow.collect { _streamableMedia.value = it }
+        }
+        viewModelScope.launch {
+            streamableVideosFlow.collect { _streamableVideos.value = it }
+        }
+        viewModelScope.launch {
+            streamableAudioFlow.collect { _streamableAudio.value = it }
+        }
+    }
+
+    private fun filterAndSortFiles(
+        filesList: List<FileItem>,
+        query: String,
+        category: FileCategory,
+        field: SortField,
+        ascending: Boolean
+    ): List<FileItem> {
+        var result = filesList
+        if (query.isNotBlank()) {
+            result = result.filter { it.name.contains(query, ignoreCase = true) }
         }
 
-        val categorized = when (selectedCategory) {
+        val categorized = when (category) {
             FileCategory.ALL -> result
             FileCategory.VIDEOS -> result.filter { it.isDir || it.isVideo }
             FileCategory.AUDIO -> result.filter { it.isDir || it.isAudio }
@@ -119,23 +201,23 @@ class FileViewModel : ViewModel() {
 
         val comparator = compareByDescending<FileItem> { it.isDir }
 
-        val sorted = when (sortField) {
+        val sorted = when (field) {
             SortField.NAME -> {
-                if (sortAscending) {
+                if (ascending) {
                     comparator.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
                 } else {
                     comparator.thenByDescending(String.CASE_INSENSITIVE_ORDER) { it.name }
                 }
             }
             SortField.SIZE -> {
-                if (sortAscending) {
+                if (ascending) {
                     comparator.thenBy { it.size }
                 } else {
                     comparator.thenByDescending { it.size }
                 }
             }
             SortField.TYPE -> {
-                if (sortAscending) {
+                if (ascending) {
                     comparator.thenBy { it.extension }
                         .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
                 } else {
@@ -145,19 +227,7 @@ class FileViewModel : ViewModel() {
             }
         }
 
-        categorized.sortedWith(sorted)
-    }
-
-    val streamableMedia: List<FileItem> by derivedStateOf {
-        files.filter { it.isVideo || it.isAudio }
-    }
-
-    val streamableVideos: List<FileItem> by derivedStateOf {
-        files.filter { it.isVideo }
-    }
-
-    val streamableAudio: List<FileItem> by derivedStateOf {
-        files.filter { it.isAudio }
+        return categorized.sortedWith(sorted)
     }
 
     companion object {

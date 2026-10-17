@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.codershubinc.aaxion_mob.ui.designsystem.GlassButton
 import com.codershubinc.aaxion_mob.ui.theme.*
 
 @Composable
@@ -35,6 +36,8 @@ fun MusicHeaderActions(
     onAddTrack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val accentColor = LocalAccentColor.current
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -46,114 +49,42 @@ fun MusicHeaderActions(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // "Shuffle All" primary button (User's core everyday action)
-            val shuffleGradient = Brush.horizontalGradient(
-                listOf(
-                    StreamerGreen,
-                    Color(0xFF059669)
-                )
-            )
-
-            Box(
+            // "Shuffle All" primary button
+            GlassButton(
+                text = if (trackCount > 0) "Shuffle ($trackCount)" else "Shuffle All",
+                onClick = onShuffleAll,
+                icon = Icons.Default.Shuffle,
+                isPrimary = true,
+                cornerRadius = 12.dp,
+                accentColor = accentColor,
                 modifier = Modifier
                     .weight(1.2f)
                     .height(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(shuffleGradient)
-                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
-                    .clickable(onClick = onShuffleAll),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = Color.Black,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Shuffle All",
-                        color = Color.Black,
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (trackCount > 0) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "($trackCount)",
-                            color = Color.Black.copy(alpha = 0.75f),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
+            )
 
             // "Play All" sequential button
-            Box(
+            GlassButton(
+                text = "Play All",
+                onClick = onPlayAll,
+                icon = Icons.Default.PlayArrow,
+                isPrimary = false,
+                cornerRadius = 12.dp,
+                accentColor = accentColor,
                 modifier = Modifier
                     .weight(1f)
                     .height(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(GlassSurfaceMedium)
-                    .border(0.8.dp, GlassHairline, RoundedCornerShape(12.dp))
-                    .clickable(onClick = onPlayAll),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Play All",
-                        tint = TextPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Play All",
-                        color = TextPrimary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
+            )
 
             if (onAddTrack != null) {
-                Box(
-                    modifier = Modifier
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(StreamerGreen.copy(alpha = 0.18f))
-                        .border(0.8.dp, StreamerGreen.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                        .clickable(onClick = onAddTrack)
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Track",
-                            tint = StreamerGreen,
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Add",
-                            color = StreamerGreen,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
+                GlassButton(
+                    text = "Add",
+                    onClick = onAddTrack,
+                    icon = Icons.Default.Add,
+                    isPrimary = false,
+                    cornerRadius = 12.dp,
+                    accentColor = accentColor,
+                    modifier = Modifier.height(44.dp)
+                )
             }
         }
 

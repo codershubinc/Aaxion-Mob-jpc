@@ -8,8 +8,11 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 class Fetcher private constructor() {
+    @Volatile
     private var apiService: ApiService? = null
+    @Volatile
     private var currentBaseUrl: String? = null
+    @Volatile
     private var okHttpClient: OkHttpClient? = null
 
     companion object {
@@ -24,44 +27,39 @@ class Fetcher private constructor() {
     }
 
     fun getClient(): OkHttpClient {
-        if (okHttpClient == null) {
-            val logging = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+        return okHttpClient ?: synchronized(this) {
+            okHttpClient ?: run {
+                val logging = HttpLoggingInterceptor().apply {
+                    level = HttpLoggingInterceptor.Level.BODY
+                }
+                OkHttpClient.Builder()
+                    .connectTimeout(15, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .writeTimeout(30, TimeUnit.SECONDS)
+                    .addInterceptor(logging)
+                    .build()
+                    .also { okHttpClient = it }
             }
-            okHttpClient = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(20, TimeUnit.SECONDS)
-                .writeTimeout(20, TimeUnit.SECONDS)
-                .addInterceptor(logging)
-                .build()
         }
-        return okHttpClient!!
     }
 
     fun getService(baseUrl: String): ApiService {
         val formattedBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
 
         if (apiService == null || currentBaseUrl != formattedBaseUrl) {
-            currentBaseUrl = formattedBaseUrl
+            synchronized(this) {
+                if (apiService == null || currentBaseUrl != formattedBaseUrl) {
+                    currentBaseUrl = formattedBaseUrl
 
-            val logging = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+                    val retrofit = Retrofit.Builder()
+                        .baseUrl(formattedBaseUrl)
+                        .addConverterFactory(GsonConverterFactory.create())
+                        .client(getClient())
+                        .build()
+
+                    apiService = retrofit.create(ApiService::class.java)
+                }
             }
-
-            val client = OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
-                .addInterceptor(logging)
-                .build()
-
-            val retrofit = Retrofit.Builder()
-                .baseUrl(formattedBaseUrl)
-                .addConverterFactory(GsonConverterFactory.create())
-                .client(client)
-                .build()
-
-            apiService = retrofit.create(ApiService::class.java)
         }
         return apiService!!
     }

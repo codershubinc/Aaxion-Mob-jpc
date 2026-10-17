@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        val coilOkHttpClient = OkHttpClient.Builder()
+        val coilOkHttpClient = com.codershubinc.aaxion_mob.core.network.Fetcher.getInstance().getClient().newBuilder()
             .addInterceptor { chain ->
                 val request = chain.request()
                 val token = TokenManager.getInstance(applicationContext).accessTokenState.value
@@ -168,6 +168,11 @@ class MainActivity : ComponentActivity() {
 
         if (hideTypes != 0) insetsController.hide(hideTypes)
         if (showTypes != 0) insetsController.show(showTypes)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        com.codershubinc.aaxion_mob.core.media.MediaPlayerManager.getInstance(applicationContext).release()
     }
 }
 

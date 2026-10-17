@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -129,63 +130,80 @@ fun SettingsScreen(
             ) {
                 // SECTION: Server & Connection
                 SettingsSectionHeader("SERVER & CONNECTION")
-                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder) {
-                    SettingsRow(
-                        icon = Icons.Default.Dns,
-                        iconTint = accentColor,
-                        title = "Target Server Host",
-                        subtitle = serverUri.ifBlank { "Auto-discovered Host" }
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    InsetGlassDivider(startIndent = 48.dp)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    SettingsRow(
-                        icon = Icons.Default.CheckCircle,
-                        iconTint = AaxionSuccess,
-                        title = "Connection State",
-                        subtitle = "Connected & Active"
-                    )
+                InsetGroupedGlassCard {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        SettingsRow(
+                            icon = Icons.Default.Dns,
+                            iconTint = accentColor,
+                            title = "Target Server Host",
+                            subtitle = serverUri.ifBlank { "Auto-discovered Host" }
+                        )
+                    }
+                    InsetGlassDivider(startIndent = 56.dp)
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        SettingsRow(
+                            icon = Icons.Default.CheckCircle,
+                            iconTint = AaxionSuccess,
+                            title = "Connection State",
+                            subtitle = "Connected & Active"
+                        )
+                    }
                 }
 
                 // SECTION: Security & Tokens
                 SettingsSectionHeader("SECURITY & TOKEN ENGINE")
-                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder) {
-                    SettingsRow(
-                        icon = Icons.Default.Lock,
-                        iconTint = StreamerOrange,
-                        title = "Master Token",
-                        subtitle = if (!activeMasterToken.isNullOrBlank()) "••••••••••••${activeMasterToken!!.takeLast(6)}" else "Available"
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Used automatically to regenerate access tokens every 4 hours.",
-                        color = TextTertiary,
-                        fontSize = 11.sp
-                    )
+                InsetGroupedGlassCard {
+                    // Row 1: Master Token
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        SettingsRow(
+                            icon = Icons.Default.Lock,
+                            iconTint = StreamerOrange,
+                            title = "Master Token",
+                            subtitle = if (!activeMasterToken.isNullOrBlank()) "••••••••••••${activeMasterToken!!.takeLast(6)}" else "Available"
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Used automatically to regenerate access tokens every 4 hours.",
+                            color = TextTertiary,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(start = 44.dp)
+                        )
+                    }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    InsetGlassDivider(startIndent = 48.dp)
-                    Spacer(modifier = Modifier.height(12.dp))
+                    InsetGlassDivider(startIndent = 56.dp)
 
-                    SettingsRow(
-                        icon = Icons.Default.Key,
-                        iconTint = accentColor,
-                        title = "Bearer Access Token",
-                        subtitle = if (!activeAccessToken.isNullOrBlank()) "••••••••••••${activeAccessToken!!.takeLast(6)}" else "Active"
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Attached to all Drive file operations, media streams, and image requests.",
-                        color = TextTertiary,
-                        fontSize = 11.sp
-                    )
+                    // Row 2: Bearer Access Token
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        SettingsRow(
+                            icon = Icons.Default.Key,
+                            iconTint = accentColor,
+                            title = "Bearer Access Token",
+                            subtitle = if (!activeAccessToken.isNullOrBlank()) "••••••••••••${activeAccessToken!!.takeLast(6)}" else "Active"
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Attached to all Drive file operations, media streams, and image requests.",
+                            color = TextTertiary,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(start = 44.dp)
+                        )
+                    }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    InsetGlassDivider(startIndent = 48.dp)
-                    Spacer(modifier = Modifier.height(12.dp))
+                    InsetGlassDivider(startIndent = 56.dp)
 
+                    // Row 3: Last Token Refresh
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -222,27 +240,30 @@ fun SettingsScreen(
 
                 // SECTION: Appearance & Display
                 SettingsSectionHeader("APPEARANCE")
-                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder) {
-                    SettingsRow(
-                        icon = Icons.Default.DarkMode,
-                        iconTint = Color(currentAccent.colorHex),
-                        title = "Theme",
-                        subtitle = "AMOLED True Black (#000000)"
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    InsetGlassDivider(startIndent = 48.dp)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    SettingsRow(
-                        icon = Icons.Default.Fullscreen,
-                        iconTint = Color(currentAccent.colorHex),
-                        title = "Immersive Mode",
-                        subtitle = "Status bar and navigation bar hidden"
-                    )
+                InsetGroupedGlassCard {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        SettingsRow(
+                            icon = Icons.Default.DarkMode,
+                            iconTint = Color(currentAccent.colorHex),
+                            title = "Theme",
+                            subtitle = "AMOLED True Black (#000000)"
+                        )
+                    }
+                    InsetGlassDivider(startIndent = 56.dp)
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        SettingsRow(
+                            icon = Icons.Default.Fullscreen,
+                            iconTint = Color(currentAccent.colorHex),
+                            title = "Immersive Mode",
+                            subtitle = "Status bar and navigation bar hidden"
+                        )
+                    }
                 }
 
                 // SECTION: Accent Color Customization
                 SettingsSectionHeader("ACCENT COLOR")
-                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder) {
+                InsetGroupedGlassCard {
+                    Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Choose UI Accent Color",
                         color = TextPrimary,
@@ -310,88 +331,70 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
 
                 // SECTION: Icon Pack Style
                 SettingsSectionHeader("ICON PACK THEME")
-                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder) {
-                    Text(
-                        text = "Explorer Vector Pack",
-                        color = TextPrimary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "Visual design style for folders, media, and document files",
-                        color = TextTertiary,
-                        fontSize = 11.sp
-                    )
+                InsetGroupedGlassCard {
+                    IconPackTheme.values().forEachIndexed { index, pack ->
+                        val isSelected = currentIconPack == pack
+                        val packAccentColor = Color(currentAccent.colorHex)
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IconPackTheme.values().forEach { pack ->
-                            val isSelected = currentIconPack == pack
-                            val accentColor = Color(currentAccent.colorHex)
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) accentColor.copy(alpha = 0.12f) else AaxionSurfaceVariant)
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (isSelected) accentColor.copy(alpha = 0.6f) else AaxionBorder,
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable {
-                                        scope.launch {
-                                            dataStoreManager.setIconPack(pack.id)
-                                            Toast.makeText(context, "Icon pack set to ${pack.title}", Toast.LENGTH_SHORT).show()
-                                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    scope.launch {
+                                        dataStoreManager.setIconPack(pack.id)
+                                        Toast.makeText(context, "Icon pack set to ${pack.title}", Toast.LENGTH_SHORT).show()
                                     }
-                                    .padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(packAccentColor.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(accentColor.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = pack.previewFolderIcon(),
-                                        contentDescription = null,
-                                        tint = accentColor,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(10.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = pack.title,
-                                        color = if (isSelected) Color.White else TextPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = pack.description,
-                                        color = TextTertiary,
-                                        fontSize = 10.sp
-                                    )
-                                }
-
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.CheckCircle,
-                                        contentDescription = null,
-                                        tint = accentColor,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
+                                Icon(
+                                    imageVector = pack.previewFolderIcon(),
+                                    contentDescription = null,
+                                    tint = packAccentColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = pack.title,
+                                    color = if (isSelected) Color.White else TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                                Text(
+                                    text = pack.description,
+                                    color = TextTertiary,
+                                    fontSize = 11.sp
+                                )
+                            }
+
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    tint = packAccentColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        if (index < IconPackTheme.values().size - 1) {
+                            InsetGlassDivider(startIndent = 56.dp)
                         }
                     }
                 }
@@ -400,9 +403,12 @@ fun SettingsScreen(
 
                 // SECTION: Server Connections
                 SettingsSectionHeader("SERVER CONNECTIONS")
-                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder, onClick = onNavigateToConnectionManager) {
+                InsetGroupedGlassCard {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToConnectionManager() }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -424,76 +430,84 @@ fun SettingsScreen(
                             imageVector = Icons.Default.ChevronRight,
                             contentDescription = "Open Connection Manager",
                             tint = TextSecondary,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+
+                // SECTION: Display Settings
+                SettingsSectionHeader("DISPLAY SETTINGS")
+                InsetGroupedGlassCard {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Hide Status Bar",
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "Hide notification bar by default",
+                                color = TextTertiary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                        Switch(
+                            checked = hideStatusBar,
+                            onCheckedChange = { 
+                                scope.launch { dataStoreManager.setHideStatusBar(it) }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(currentAccent.colorHex),
+                                checkedTrackColor = Color(currentAccent.colorHex).copy(alpha = 0.5f)
+                            )
+                        )
+                    }
+
+                    InsetGlassDivider(startIndent = 16.dp)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Hide Navigation Bar",
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "Hide system navigation bar by default",
+                                color = TextTertiary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                        Switch(
+                            checked = hideNavBar,
+                            onCheckedChange = { 
+                                scope.launch { dataStoreManager.setHideNavigationBar(it) }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(currentAccent.colorHex),
+                                checkedTrackColor = Color(currentAccent.colorHex).copy(alpha = 0.5f)
+                            )
                         )
                     }
                 }
 
                 // SECTION: Storage & Cache
-                SettingsSectionHeader("DISPLAY SETTINGS")
-                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder) {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Hide Status Bar",
-                                    color = TextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "Hide notification bar by default",
-                                    color = TextTertiary,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                            Switch(
-                                checked = hideStatusBar,
-                                onCheckedChange = { 
-                                    scope.launch { dataStoreManager.setHideStatusBar(it) }
-                                },
-                                colors = SwitchDefaults.colors(checkedThumbColor = Color(currentAccent.colorHex), checkedTrackColor = Color(currentAccent.colorHex).copy(alpha = 0.5f))
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        InsetGlassDivider(startIndent = 48.dp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Hide Navigation Bar",
-                                    color = TextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "Hide system navigation bar by default",
-                                    color = TextTertiary,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                            Switch(
-                                checked = hideNavBar,
-                                onCheckedChange = { 
-                                    scope.launch { dataStoreManager.setHideNavigationBar(it) }
-                                },
-                                colors = SwitchDefaults.colors(checkedThumbColor = Color(currentAccent.colorHex), checkedTrackColor = Color(currentAccent.colorHex).copy(alpha = 0.5f))
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
                 SettingsSectionHeader("STORAGE & CACHE")
                 val initialCacheSize = remember {
                     val diskSize = Coil.imageLoader(context).diskCache?.size
@@ -511,9 +525,11 @@ fun SettingsScreen(
                         }
                     }
                 }
-                AaxionCard(backgroundColor = AaxionCardBg, borderColor = AaxionBorder) {
+                InsetGroupedGlassCard {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -544,17 +560,16 @@ fun SettingsScreen(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
-                // SECTION: Sign Out
+
+                // SECTION: Account
                 SettingsSectionHeader("ACCOUNT")
-                AaxionCard(
-                    backgroundColor = AaxionDanger.copy(alpha = 0.06f),
-                    borderColor = AaxionDanger.copy(alpha = 0.2f),
-                    onClick = onLogout
-                ) {
+                InsetGroupedGlassCard(accentHighlight = AaxionDanger) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onLogout() }
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Logout,
@@ -597,11 +612,11 @@ fun SettingsScreen(
 private fun SettingsSectionHeader(text: String) {
     Text(
         text = text,
-        color = TextTertiary,
-        fontSize = 11.sp,
+        color = TextSecondary,
+        fontSize = 12.sp,
         fontWeight = FontWeight.Bold,
-        letterSpacing = 1.sp,
-        modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+        letterSpacing = 0.8.sp,
+        modifier = Modifier.padding(start = 16.dp, bottom = 6.dp)
     )
 }
 

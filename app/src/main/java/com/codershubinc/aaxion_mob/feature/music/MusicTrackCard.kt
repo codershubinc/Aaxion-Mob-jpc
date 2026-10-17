@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -86,25 +87,15 @@ fun MusicTrackCard(
 
     val cardShape = RoundedCornerShape(14.dp)
     val cardBorderColor = if (isCurrentTrack) {
-        animatedAccent.copy(alpha = if (isPlaying) pulseAlpha else 0.55f)
+        animatedAccent.copy(alpha = 0.30f)
     } else {
-        animatedAccent.copy(alpha = 0.16f)
+        GlassHairline
     }
 
     val cardBg = if (isCurrentTrack) {
-        Brush.horizontalGradient(
-            listOf(
-                animatedAccent.copy(alpha = 0.15f),
-                AaxionCardBg
-            )
-        )
+        animatedAccent.copy(alpha = 0.12f)
     } else {
-        Brush.linearGradient(
-            listOf(
-                AaxionCardBg,
-                AaxionCardBg
-            )
-        )
+        AaxionCardBg
     }
 
     Box(
@@ -112,7 +103,7 @@ fun MusicTrackCard(
             .fillMaxWidth()
             .clip(cardShape)
             .background(cardBg)
-            .border(if (isCurrentTrack) 1.4.dp else 0.6.dp, cardBorderColor, cardShape)
+            .border(0.5.dp, cardBorderColor, cardShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
@@ -231,7 +222,7 @@ fun MusicTrackCard(
                 }
             }
 
-            // Quick Play/Pause Action Button with dynamic accent
+            // Quick Play/Pause Action Button
             IconButton(
                 onClick = onPlayPauseToggle,
                 modifier = Modifier
@@ -239,21 +230,21 @@ fun MusicTrackCard(
                     .clip(CircleShape)
                     .background(
                         if (isCurrentTrack && isPlaying) {
-                            animatedAccent.copy(alpha = 0.25f)
+                            animatedAccent.copy(alpha = 0.20f)
                         } else {
                             GlassSurfaceMedium
                         }
                     )
                     .border(
-                        0.6.dp,
-                        if (isCurrentTrack) animatedAccent.copy(alpha = 0.5f) else Color.Transparent,
+                        0.5.dp,
+                        if (isCurrentTrack) animatedAccent.copy(alpha = 0.4f) else Color.Transparent,
                         CircleShape
                     )
             ) {
                 Icon(
-                    imageVector = if (isCurrentTrack && isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    imageVector = if (isCurrentTrack && isPlaying) Icons.Default.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = if (isCurrentTrack && isPlaying) "Pause" else "Play",
-                    tint = if (isCurrentTrack) animatedAccent else animatedAccent.copy(alpha = 0.85f),
+                    tint = if (isCurrentTrack) animatedAccent else TextSecondary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -291,39 +282,17 @@ fun MusicTrackCard(
         label = "track_artwork_dynamic_accent"
     )
 
-    // Pulsing glow border highlight for actively playing track
-    val infiniteTransition = rememberInfiniteTransition(label = "music_track_pulse_border")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.90f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "music_track_pulse_alpha"
-    )
-
     val cardShape = RoundedCornerShape(14.dp)
     val cardBorderColor = if (isCurrentTrack) {
-        animatedAccent.copy(alpha = if (isPlaying) pulseAlpha else 0.55f)
+        animatedAccent.copy(alpha = 0.30f)
     } else {
-        animatedAccent.copy(alpha = 0.16f)
+        GlassHairline
     }
 
     val cardBg = if (isCurrentTrack) {
-        Brush.horizontalGradient(
-            listOf(
-                animatedAccent.copy(alpha = 0.15f),
-                AaxionCardBg
-            )
-        )
+        animatedAccent.copy(alpha = 0.12f)
     } else {
-        Brush.linearGradient(
-            listOf(
-                AaxionCardBg,
-                AaxionCardBg
-            )
-        )
+        AaxionCardBg
     }
 
     val formatBadge = track.filePath.substringAfterLast('.', "MP3").uppercase()
@@ -337,7 +306,7 @@ fun MusicTrackCard(
             .fillMaxWidth()
             .clip(cardShape)
             .background(cardBg)
-            .border(if (isCurrentTrack) 1.4.dp else 0.6.dp, cardBorderColor, cardShape)
+            .border(0.5.dp, cardBorderColor, cardShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
@@ -490,21 +459,21 @@ fun MusicTrackCard(
                     .clip(CircleShape)
                     .background(
                         if (isCurrentTrack && isPlaying) {
-                            animatedAccent.copy(alpha = 0.25f)
+                            animatedAccent.copy(alpha = 0.20f)
                         } else {
                             GlassSurfaceMedium
                         }
                     )
                     .border(
-                        0.6.dp,
-                        if (isCurrentTrack) animatedAccent.copy(alpha = 0.5f) else Color.Transparent,
+                        0.5.dp,
+                        if (isCurrentTrack) animatedAccent.copy(alpha = 0.4f) else Color.Transparent,
                         CircleShape
                     )
             ) {
                 Icon(
-                    imageVector = if (isCurrentTrack && isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    imageVector = if (isCurrentTrack && isPlaying) Icons.Default.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = if (isCurrentTrack && isPlaying) "Pause" else "Play",
-                    tint = if (isCurrentTrack) animatedAccent else animatedAccent.copy(alpha = 0.85f),
+                    tint = if (isCurrentTrack) animatedAccent else TextSecondary,
                     modifier = Modifier.size(20.dp)
                 )
             }

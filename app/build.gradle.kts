@@ -1,7 +1,20 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+val versionPropsFile = rootProject.file("version.properties")
+val versionProps = Properties().apply {
+    if (versionPropsFile.exists()) {
+        versionPropsFile.inputStream().use { load(it) }
+    }
+}
+val appVersionCode = (versionProps.getProperty("VERSION_CODE")
+    ?: versionProps.getProperty("versionCode") ?: "1").toInt()
+val appVersionName = versionProps.getProperty("VERSION_NAME")
+    ?: versionProps.getProperty("versionName") ?: "0.0.1"
 
 android {
     namespace = "com.codershubinc.aaxion_mob"
@@ -11,12 +24,11 @@ android {
         applicationId = "com.codershubinc.aaxion_mob"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-
 
     signingConfigs {
         create("release") {
@@ -43,14 +55,6 @@ android {
             )
         }
     }
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a", "x86_64")
-            isUniversalApk = true
-        }
-    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -58,6 +62,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

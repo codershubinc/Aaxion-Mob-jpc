@@ -67,9 +67,9 @@ import com.codershubinc.aaxion_mob.core.network.Fetcher
 import com.codershubinc.aaxion_mob.core.network.ServerPingHelper
 import com.codershubinc.aaxion_mob.core.util.IntentUtils
 import com.codershubinc.aaxion_mob.feature.settings.SettingsScreen
+import com.codershubinc.aaxion_mob.feature.music.MusicView
 import com.codershubinc.aaxion_mob.feature.storage.StorageAndHubView
 import com.codershubinc.aaxion_mob.feature.storage.StorageInfoTile
-import com.codershubinc.aaxion_mob.feature.streamer.StreamerMediaView
 import com.codershubinc.aaxion_mob.ui.designsystem.AaxionCard
 import com.codershubinc.aaxion_mob.ui.designsystem.*
 import com.codershubinc.aaxion_mob.ui.theme.*
@@ -107,7 +107,7 @@ fun AaxionDriveScreen(
 
     val effectiveToken = if (!activeAccessToken.isNullOrBlank()) activeAccessToken!! else token
 
-    // Tabs: 0 = Drive, 1 = Streamer, 2 = Storage & Tokens, 3 = Settings
+    // Tabs: 0 = Drive, 1 = Music, 2 = Storage & Tokens, 3 = Settings
     var currentTab by rememberSaveable { mutableIntStateOf(0) }
     var isGridView by rememberSaveable { mutableStateOf(true) }
     var isSidebarVisible by remember(isDesktop) { mutableStateOf(isDesktop) }
@@ -227,7 +227,7 @@ fun AaxionDriveScreen(
                             isLocalConnection = isLocalConnection,
                             onOpenConnectionManager = onNavigateToConnectionManager
                         )
-                        1 -> StreamerMediaView(
+                        1 -> MusicView(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
@@ -301,14 +301,14 @@ fun AaxionDriveScreen(
                         ) {
                             val tabs = listOf(
                                 Triple("Drive", Icons.Default.CloudQueue, 0),
-                                Triple("Streamer", Icons.Default.PlayCircleFilled, 1),
+                                Triple("Music", Icons.Default.Headphones, 1),
                                 Triple("Storage", Icons.Default.Storage, 2),
                                 Triple("Settings", Icons.Default.Settings, 3)
                             )
 
                             tabs.forEach { (title, icon, index) ->
                                 val isSelected = currentTab == index
-                                val tabColor = if (index == 1) StreamerOrange else accentColor
+                                val tabColor = if (index == 1) StreamerGreen else accentColor
 
                                 val scale by animateFloatAsState(
                                     targetValue = if (isSelected) 1.05f else 1f,
@@ -394,7 +394,7 @@ fun AaxionDriveScreen(
                             isLocalConnection = isLocalConnection,
                             onOpenConnectionManager = onNavigateToConnectionManager
                         )
-                        1 -> StreamerMediaView(
+                        1 -> MusicView(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,

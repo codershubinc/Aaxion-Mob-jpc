@@ -8,6 +8,7 @@ import android.os.PowerManager
 import android.view.Surface
 import com.codershubinc.aaxion_mob.core.model.FileItem
 import com.codershubinc.aaxion_mob.core.network.buildImageViewUrl
+import com.codershubinc.aaxion_mob.core.network.buildStreamUrl
 import com.codershubinc.aaxion_mob.core.network.buildThumbUrl
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,7 @@ data class MediaPlaybackState(
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
     val isLooping: Boolean = false,
+    val isShuffle: Boolean = false,
     val playbackSpeed: Float = 1.0f,
     val currentPositionMs: Long = 0L,
     val durationMs: Long = 0L,
@@ -33,7 +35,9 @@ data class MediaPlaybackState(
     val videoHeight: Int = 0,
     val isExpanded: Boolean = false,
     val isVisible: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val queueSize: Int = 0,
+    val queueIndex: Int = -1
 ) {
     val progressFraction: Float
         get() = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
@@ -114,6 +118,12 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
     private var mediaPlayer: MediaPlayer? = null
     private var currentSurface: Surface? = null
     private var progressJob: Job? = null
+
+    private var activeQueue: List<FileItem> = emptyList()
+    private var activeQueueIndex: Int = -1
+    private var activeBaseUrl: String? = null
+    private var activeToken: String? = null
+    private var activeSiblingFiles: List<FileItem>? = null
 
     private val _state = MutableStateFlow(MediaPlaybackState())
     val state: StateFlow<MediaPlaybackState> = _state.asStateFlow()
@@ -231,7 +241,9 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
                     }
 
                     setOnCompletionListener {
-                        if (!_state.value.isLooping) {
+                        if (!_state.value.isLooping && hasNextTrack()) {
+                            playNext()
+                        } else if (!_state.value.isLooping) {
                             _state.update { it.copy(isPlaying = false, currentPositionMs = it.durationMs) }
                             stopProgressTracker()
                         }
@@ -344,6 +356,96 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
         val nextIdx = (speeds.indexOf(current) + 1).let { if (it in speeds.indices) it else 0 }
         setPlaybackSpeed(speeds[nextIdx])
     }
+
+    /**
+     * Starts playback for a list of tracks with optional shuffle.
+     * Automatically sets the active queue and starts with startIndex.
+     */
+    fun playQueue(
+        tracks: List<FileItem>,
+        startIndex: Int = 0,
+        shuffle: Boolean = false,
+        token: String? = null,
+        baseUrl: String? = null,
+        siblingFiles: List<FileItem>? = null
+    ) {
+        if (tracks.isEmpty()) return
+        val queue = if (shuffle) tracks.shuffled() else tracks
+        activeQueue = queue
+        activeBaseUrl = baseUrl
+        activeToken = token
+        activeSiblingFiles = siblingFiles
+        val idx = startIndex.coerceIn(0, queue.size - 1)
+        activeQueueIndex = idx
+        _state.update { it.copy(isShuffle = shuffle, queueSize = queue.size, queueIndex = idx) }
+        val target = queue[idx]
+        val effectiveBase = baseUrl ?: extractBaseUrl(target.rawPath)
+        val effectiveTkn = token ?: ""
+        val streamUrl = target.buildStreamUrl(effectiveBase, effectiveTkn)
+        play(
+            file = target,
+            streamUrl = streamUrl,
+            isVideo = target.isVideo,
+            token = effectiveTkn,
+            baseUrl = effectiveBase,
+            siblingFiles = siblingFiles
+        )
+    }
+
+    fun playNext() {
+        if (activeQueue.isEmpty()) return
+        val nextIdx = if (activeQueueIndex + 1 < activeQueue.size) {
+            activeQueueIndex + 1
+        } else if (_state.value.isLooping) {
+            0
+        } else return
+
+        activeQueueIndex = nextIdx
+        _state.update { it.copy(queueIndex = nextIdx) }
+        val target = activeQueue[nextIdx]
+        val effectiveBase = activeBaseUrl ?: ""
+        val effectiveTkn = activeToken ?: ""
+        val streamUrl = target.buildStreamUrl(effectiveBase, effectiveTkn)
+        play(
+            file = target,
+            streamUrl = streamUrl,
+            isVideo = target.isVideo,
+            token = effectiveTkn,
+            baseUrl = effectiveBase,
+            siblingFiles = activeSiblingFiles
+        )
+    }
+
+    fun playPrevious() {
+        if (activeQueue.isEmpty()) return
+        if (_state.value.currentPositionMs > 3000L) {
+            seekTo(0L)
+            return
+        }
+        val prevIdx = if (activeQueueIndex - 1 >= 0) {
+            activeQueueIndex - 1
+        } else {
+            0
+        }
+        activeQueueIndex = prevIdx
+        _state.update { it.copy(queueIndex = prevIdx) }
+        val target = activeQueue[prevIdx]
+        val effectiveBase = activeBaseUrl ?: ""
+        val effectiveTkn = activeToken ?: ""
+        val streamUrl = target.buildStreamUrl(effectiveBase, effectiveTkn)
+        play(
+            file = target,
+            streamUrl = streamUrl,
+            isVideo = target.isVideo,
+            token = effectiveTkn,
+            baseUrl = effectiveBase,
+            siblingFiles = activeSiblingFiles
+        )
+    }
+
+    fun hasNextTrack(): Boolean = activeQueue.isNotEmpty() && (activeQueueIndex + 1 < activeQueue.size || _state.value.isLooping)
+
+    fun hasPreviousTrack(): Boolean = activeQueue.isNotEmpty() && activeQueueIndex > 0
 
     private fun applyPlaybackSpeed(player: MediaPlayer, speed: Float) {
         try {

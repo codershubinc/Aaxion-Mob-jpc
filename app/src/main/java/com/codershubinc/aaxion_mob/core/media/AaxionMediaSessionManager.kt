@@ -45,11 +45,21 @@ class AaxionMediaSessionManager(private val appContext: Context) {
             }
 
             override fun onSkipToNext() {
-                MediaPlayerManager.getInstance(appContext).seekRelative(10000L)
+                val mgr = MediaPlayerManager.getInstance(appContext)
+                if (mgr.hasNextTrack()) {
+                    mgr.playNext()
+                } else {
+                    mgr.seekRelative(10000L)
+                }
             }
 
             override fun onSkipToPrevious() {
-                MediaPlayerManager.getInstance(appContext).seekRelative(-10000L)
+                val mgr = MediaPlayerManager.getInstance(appContext)
+                if (mgr.hasPreviousTrack()) {
+                    mgr.playPrevious()
+                } else {
+                    mgr.seekRelative(-10000L)
+                }
             }
 
             override fun onSeekTo(pos: Long) {

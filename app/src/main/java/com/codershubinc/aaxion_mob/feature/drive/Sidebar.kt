@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -228,11 +229,11 @@ fun SidebarContent(
             )
             Spacer(modifier = Modifier.height(4.dp))
             TabletSidebarItem(
-                icon = Icons.Default.PlayCircleFilled,
-                label = "Streamer",
+                icon = Icons.Default.Headphones,
+                label = "Music",
                 isSelected = currentTab == 1,
                 onClick = { onTabSelected(1) },
-                selectedColor = StreamerOrange
+                selectedColor = StreamerGreen
             )
             Spacer(modifier = Modifier.height(4.dp))
             TabletSidebarItem(

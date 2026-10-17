@@ -65,7 +65,7 @@ fun formatTimeMs(ms: Long): String {
  * In-built Media Player that doubles as a Floating Island capsule / card docked at the bottom.
  * Plays audio & video continuously in the background while users explore files.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun FloatingIslandPlayer(
     modifier: Modifier = Modifier
@@ -82,15 +82,12 @@ fun FloatingIslandPlayer(
     val configuration = LocalConfiguration.current
     val isMobile = configuration.screenWidthDp < 768
 
-    // Position above mobile bottom navigation dock when collapsed, or full bottom sheet when expanded
-    val bottomMargin = if (!state.isExpanded) {
-        if (isMobile) 86.dp else 16.dp
-    } else {
-        if (isMobile) 10.dp else 20.dp
-    }
+    // Position above navigation dock when collapsed
+    val bottomMargin = if (isMobile) 86.dp else 16.dp
 
+    // Compact floating island capsule (visible when not expanded)
     AnimatedVisibility(
-        visible = state.isVisible,
+        visible = state.isVisible && !state.isExpanded,
         enter = slideInVertically(initialOffsetY = { it }) + fadeIn(tween(250)),
         exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(tween(200)),
         modifier = modifier
@@ -102,40 +99,55 @@ fun FloatingIslandPlayer(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.BottomCenter
         ) {
-            if (!state.isExpanded) {
-                // ==========================================
-                // COMPACT FLOATING ISLAND (Bottom Capsule)
-                // ==========================================
-                CompactIslandView(
-                    state = state,
-                    accentColor = mediaAccent,
-                    onTogglePlay = { manager.togglePlayPause() },
-                    onExpand = { manager.setExpanded(true) },
-                    onClose = { manager.close() }
-                )
-            } else {
-                // ==========================================
-                // EXPANDED FLOATING ISLAND (Bottom Card)
-                // ==========================================
-                ExpandedIslandView(
-                    state = state,
-                    manager = manager,
-                    accentColor = mediaAccent,
-                    onCollapse = { manager.setExpanded(false) },
-                    onClose = { manager.close() },
-                    onOpenExternal = {
-                        state.currentFile?.let { file ->
-                            IntentUtils.launchStreamIntent(
-                                context = context,
-                                streamUrl = state.streamUrl,
-                                isVideo = state.isVideo,
-                                title = file.name
-                            )
-                        }
-                    }
-                )
-            }
+            CompactIslandView(
+                state = state,
+                accentColor = mediaAccent,
+                onTogglePlay = { manager.togglePlayPause() },
+                onExpand = { manager.setExpanded(true) },
+                onClose = { manager.close() }
+            )
         }
+    }
+
+    // Expanded player bottom sheet with 75% dark scrim
+    if (state.isExpanded) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { manager.setExpanded(false) },
+            sheetState = sheetState,
+            containerColor = Color(0xFF0C0C10).copy(alpha = 0.98f),
+            scrimColor = Color.Black.copy(alpha = 0.75f),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = null,
+            modifier = Modifier.widthIn(max = 560.dp),
+            content = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(bottom = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ExpandedIslandView(
+                        state = state,
+                        manager = manager,
+                        accentColor = mediaAccent,
+                        onCollapse = { manager.setExpanded(false) },
+                        onClose = { manager.close() },
+                        onOpenExternal = {
+                            state.currentFile?.let { file ->
+                                IntentUtils.launchStreamIntent(
+                                    context = context,
+                                    streamUrl = state.streamUrl,
+                                    isVideo = state.isVideo,
+                                    title = file.name
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+        )
     }
 }
 
@@ -449,25 +461,16 @@ private fun ExpandedIslandView(
                 }
             }
     ) {
-        // Frosted blur backdrop layers
+        // Near-opaque spatial glass surface to obscure UI underneath and eliminate visual clutter
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .blur(20.dp)
-                .background(accentColor.copy(alpha = 0.20f), cardShape)
+                .background(Color(0xFF0C0C10).copy(alpha = 0.98f), cardShape)
         )
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFF1A1D28).copy(alpha = 0.62f),
-                            Color(0xFF0D0F16).copy(alpha = 0.74f)
-                        )
-                    ),
-                    cardShape
-                )
+                .background(GlassBrushes.elevatedPopupSurface(accentColor), cardShape)
         )
 
         // Top specular reflection line
@@ -719,18 +722,27 @@ private fun ExpandedIslandView(
         Text(
             text = fileName,
             color = TextPrimary,
-            fontSize = 14.sp,
+            fontSize = 14.5.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        if (!state.displayArtist.isNullOrBlank()) {
+        val artistAlbumSubtitle = buildString {
+            if (!state.displayArtist.isNullOrBlank()) {
+                append(state.displayArtist)
+            }
+            if (!state.displayAlbum.isNullOrBlank() && state.displayAlbum != fileName) {
+                if (isNotEmpty()) append(" • ")
+                append(state.displayAlbum)
+            }
+        }
+        if (artistAlbumSubtitle.isNotBlank()) {
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = state.displayArtist,
-                color = accentColor,
+                text = artistAlbumSubtitle,
+                color = TextSecondary,
                 fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

@@ -417,7 +417,7 @@ fun GlassModalBottomSheet(
     modifier: Modifier = Modifier,
     sheetState: SheetState = rememberModalBottomSheetState(),
     accentHighlight: Color? = null,
-    scrimColor: Color = Color.Black.copy(alpha = 0.65f),
+    scrimColor: Color = Color.Black.copy(alpha = 0.75f),
     content: @Composable ColumnScope.() -> Unit
 ) {
     val topShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
@@ -425,7 +425,7 @@ fun GlassModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
         modifier = modifier.widthIn(max = 560.dp),
-        containerColor = Color(0xFF0E0E12).copy(alpha = 0.94f),
+        containerColor = Color(0xFF0C0C10).copy(alpha = 0.98f),
         scrimColor = scrimColor,
         shape = topShape,
         dragHandle = null,

@@ -81,6 +81,18 @@ object GlassBrushes {
         )
     }
 
+    fun elevatedPopupSurface(accent: Color = Color.Transparent): Brush {
+        val startColor = if (accent != Color.Transparent) {
+            Color(0xFF14141A).copy(alpha = 0.98f)
+        } else {
+            Color(0xFF16161D).copy(alpha = 0.98f)
+        }
+        val endColor = Color(0xFF0C0C10).copy(alpha = 0.98f)
+        return Brush.verticalGradient(
+            colors = listOf(startColor, endColor)
+        )
+    }
+
     fun specularBorder(accent: Color? = null): Brush {
         val startColor = if (accent != null && accent != Color.Transparent) {
             accent.copy(alpha = 0.55f)

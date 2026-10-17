@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.codershubinc.aaxion_mob.core.media.MediaPlayerManager
+import com.codershubinc.aaxion_mob.core.media.VlcPlayerManager
 import com.codershubinc.aaxion_mob.core.model.FileItem
 import com.codershubinc.aaxion_mob.core.network.buildDownloadUrl
 import com.codershubinc.aaxion_mob.core.network.buildStreamUrl
@@ -171,15 +172,13 @@ fun FileActionModal(
                         onClick = onOpen
                     )
 
-                    // Stream Actions (Floating Island & External Player)
-                    if (file.isVideo || file.isAudio) {
+                    if (file.isAudio) {
                         InsetGlassDivider(startIndent = 56.dp)
-                        val streamColor = if (file.isVideo) StreamerOrange else StreamerGreen
                         ModalActionItem(
                             icon = Icons.Default.PlayArrow,
-                            title = if (file.isVideo) "Play in Floating Island" else "Play in Floating Island",
+                            title = "Play in Floating Island",
                             subtitle = "Continuous in-app playback with capsule & player card",
-                            accentColor = streamColor,
+                            accentColor = StreamerGreen,
                             onClick = {
                                 onDismiss()
                                 MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token, baseUrl = baseUrl)
@@ -189,12 +188,66 @@ fun FileActionModal(
                         InsetGlassDivider(startIndent = 56.dp)
                         ModalActionItem(
                             icon = Icons.AutoMirrored.Filled.Launch,
-                            title = if (file.isVideo) "Stream in External Player" else "Stream Audio Externally",
-                            subtitle = "Open stream via external player (e.g. VLC)",
+                            title = "Stream Audio Externally",
+                            subtitle = "Open stream via external player",
                             accentColor = TextSecondary,
                             onClick = {
                                 onDismiss()
-                                IntentUtils.launchStreamIntent(context, streamUrl, file.isVideo, title = file.name)
+                                IntentUtils.launchStreamIntent(context, streamUrl, isVideo = false, title = file.name)
+                            }
+                        )
+                    } else if (file.isVideo) {
+                        val vlcManager = remember(context) { VlcPlayerManager.getInstance(context) }
+                        val videoProgress = remember(file.rawPath) { vlcManager.getProgress(file.rawPath) }
+                        val hasResume = videoProgress != null && videoProgress.positionMs >= 5000L
+
+                        if (hasResume) {
+                            InsetGlassDivider(startIndent = 56.dp)
+                            ModalActionItem(
+                                icon = Icons.Default.PlayArrow,
+                                title = "Resume Video in VLC (${videoProgress.formattedPosition})",
+                                subtitle = "Continue watching from saved position",
+                                accentColor = StreamerOrange,
+                                onClick = {
+                                    onDismiss()
+                                    vlcManager.launchVlc(context, file, streamUrl, resume = true)
+                                }
+                            )
+
+                            InsetGlassDivider(startIndent = 56.dp)
+                            ModalActionItem(
+                                icon = Icons.Default.Replay,
+                                title = "Start from Beginning",
+                                subtitle = "Play video from 00:00 in VLC",
+                                accentColor = TextSecondary,
+                                onClick = {
+                                    onDismiss()
+                                    vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                                }
+                            )
+                        } else {
+                            InsetGlassDivider(startIndent = 56.dp)
+                            ModalActionItem(
+                                icon = Icons.Default.PlayArrow,
+                                title = "Play in VLC",
+                                subtitle = "Stream video directly in VLC player",
+                                accentColor = StreamerOrange,
+                                onClick = {
+                                    onDismiss()
+                                    vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                                }
+                            )
+                        }
+
+                        InsetGlassDivider(startIndent = 56.dp)
+                        ModalActionItem(
+                            icon = Icons.AutoMirrored.Filled.Launch,
+                            title = "Stream in External Player",
+                            subtitle = "Open stream via external player chooser",
+                            accentColor = TextSecondary,
+                            onClick = {
+                                onDismiss()
+                                IntentUtils.launchStreamIntent(context, streamUrl, isVideo = true, title = file.name)
                             }
                         )
                     }

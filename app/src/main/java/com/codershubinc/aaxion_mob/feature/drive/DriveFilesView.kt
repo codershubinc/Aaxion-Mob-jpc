@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.sp
 import com.codershubinc.aaxion_mob.core.data.TokenManager
 import com.codershubinc.aaxion_mob.core.model.FileItem
 import com.codershubinc.aaxion_mob.core.media.MediaPlayerManager
+import com.codershubinc.aaxion_mob.core.media.VideoProgress
+import com.codershubinc.aaxion_mob.core.media.VlcPlayerManager
 import com.codershubinc.aaxion_mob.core.network.buildDownloadUrl
 import com.codershubinc.aaxion_mob.core.network.buildImageViewUrl
 import com.codershubinc.aaxion_mob.core.network.buildStreamUrl
@@ -69,6 +71,7 @@ fun DriveFilesView(
     val tokenManager = androidx.compose.runtime.remember { TokenManager.getInstance(context) }
     var activeViewingFile by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<FileItem?>(null) }
     var pendingDownloadFile by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<FileItem?>(null) }
+    var pendingResumeVideo by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Triple<FileItem, String, VideoProgress>?>(null) }
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
@@ -171,7 +174,7 @@ fun DriveFilesView(
                             onClick = {
                                 if (file.isDir) {
                                     viewModel.navigateTo(serverUri, token, file.rawPath, tokenManager = tokenManager)
-                                } else if (file.isVideo || file.isAudio) {
+                                } else if (file.isAudio) {
                                     val streamUrl = file.buildStreamUrl(serverUri, token)
                                     MediaPlayerManager.getInstance(context).play(
                                         file = file,
@@ -180,6 +183,15 @@ fun DriveFilesView(
                                         baseUrl = serverUri,
                                         siblingFiles = viewModel.files
                                     )
+                                } else if (file.isVideo) {
+                                    val streamUrl = file.buildStreamUrl(serverUri, token)
+                                    val vlcManager = VlcPlayerManager.getInstance(context)
+                                    val progress = vlcManager.getProgress(file.rawPath)
+                                    if (progress != null && progress.positionMs >= 5000L) {
+                                        pendingResumeVideo = Triple(file, streamUrl, progress)
+                                    } else {
+                                        vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                                    }
                                 } else if (canOpenFileInViewer(file)) {
                                     activeViewingFile = file
                                 } else {
@@ -209,7 +221,7 @@ fun DriveFilesView(
                             onClick = {
                                 if (file.isDir) {
                                     viewModel.navigateTo(serverUri, token, file.rawPath, tokenManager = tokenManager)
-                                } else if (file.isVideo || file.isAudio) {
+                                } else if (file.isAudio) {
                                     val streamUrl = file.buildStreamUrl(serverUri, token)
                                     MediaPlayerManager.getInstance(context).play(
                                         file = file,
@@ -218,6 +230,15 @@ fun DriveFilesView(
                                         baseUrl = serverUri,
                                         siblingFiles = viewModel.files
                                     )
+                                } else if (file.isVideo) {
+                                    val streamUrl = file.buildStreamUrl(serverUri, token)
+                                    val vlcManager = VlcPlayerManager.getInstance(context)
+                                    val progress = vlcManager.getProgress(file.rawPath)
+                                    if (progress != null && progress.positionMs >= 5000L) {
+                                        pendingResumeVideo = Triple(file, streamUrl, progress)
+                                    } else {
+                                        vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                                    }
                                 } else if (canOpenFileInViewer(file)) {
                                     activeViewingFile = file
                                 } else {
@@ -252,6 +273,23 @@ fun DriveFilesView(
                 DownloadHelper.enqueueDownload(context, downloadUrl, file.name, token)
                 pendingDownloadFile = null
             }
+        )
+    }
+
+    // Video Resume Confirmation Modal
+    pendingResumeVideo?.let { (file, streamUrl, progress) ->
+        VideoResumeModal(
+            file = file,
+            progress = progress,
+            onResume = {
+                VlcPlayerManager.getInstance(context).launchVlc(context, file, streamUrl, resume = true)
+                pendingResumeVideo = null
+            },
+            onStartOver = {
+                VlcPlayerManager.getInstance(context).launchVlc(context, file, streamUrl, resume = false)
+                pendingResumeVideo = null
+            },
+            onDismiss = { pendingResumeVideo = null }
         )
     }
 }

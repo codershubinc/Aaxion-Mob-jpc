@@ -58,6 +58,25 @@ import kotlinx.coroutines.flow.combine
 
 class MainActivity : ComponentActivity() {
 
+    private val vlcVideoResultLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val intentData = result.data
+        val returnedPosition = intentData?.getLongExtra("extra_position", -1L)
+            ?: intentData?.getLongExtra("position", -1L)
+            ?: intentData?.getLongExtra("result_position", -1L)
+            ?: -1L
+
+        val returnedDuration = intentData?.getLongExtra("extra_duration", 0L)
+            ?: intentData?.getLongExtra("duration", 0L)
+            ?: 0L
+
+        com.codershubinc.aaxion_mob.core.media.VlcPlayerManager.getInstance(applicationContext).handleActivityResult(
+            positionMs = returnedPosition,
+            durationMs = returnedDuration
+        )
+    }
+
     companion object {
         var isStatusBarHiddenCached: Boolean = false
             internal set
@@ -69,6 +88,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         applySystemBars()
+        com.codershubinc.aaxion_mob.core.media.VlcPlayerManager.getInstance(applicationContext).setLauncher(vlcVideoResultLauncher)
 
         lifecycleScope.launch {
             val dataStoreManager = DataStoreManager(this@MainActivity)
@@ -170,8 +190,14 @@ class MainActivity : ComponentActivity() {
         if (showTypes != 0) insetsController.show(showTypes)
     }
 
+    override fun onResume() {
+        super.onResume()
+        com.codershubinc.aaxion_mob.core.media.VlcPlayerManager.getInstance(applicationContext).onActivityResumed()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        com.codershubinc.aaxion_mob.core.media.VlcPlayerManager.getInstance(applicationContext).setLauncher(null)
         com.codershubinc.aaxion_mob.core.media.MediaPlayerManager.getInstance(applicationContext).release()
     }
 }

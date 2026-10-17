@@ -150,8 +150,7 @@ fun FileListItem(
                 }
             }
 
-            // Quick Stream Action (Floating Island)
-            if (isVideo || isAudio) {
+            if (isAudio) {
                 IconButton(
                     onClick = { MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token, baseUrl = baseUrl) },
                     modifier = Modifier.size(32.dp)
@@ -159,7 +158,19 @@ fun FileListItem(
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = "Play in Floating Island",
-                        tint = if (isVideo) StreamerOrange else StreamerGreen,
+                        tint = StreamerGreen,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            } else if (isVideo) {
+                IconButton(
+                    onClick = onClick,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "Play in VLC",
+                        tint = StreamerOrange,
                         modifier = Modifier.size(18.dp)
                     )
                 }

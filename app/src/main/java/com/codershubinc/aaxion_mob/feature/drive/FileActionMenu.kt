@@ -10,8 +10,10 @@ import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material3.DropdownMenuItem
 import com.codershubinc.aaxion_mob.core.media.MediaPlayerManager
+import com.codershubinc.aaxion_mob.core.media.VlcPlayerManager
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,14 +58,14 @@ fun FileActionMenu(
         accentHighlight = accentColor,
         modifier = modifier
     ) {
-        if (file.isVideo || file.isAudio) {
+        if (file.isAudio) {
             DropdownMenuItem(
                 text = { Text("Play in Island", color = TextPrimary, fontSize = 13.sp) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
-                        tint = if (file.isVideo) StreamerOrange else StreamerGreen,
+                        tint = StreamerGreen,
                         modifier = Modifier.size(16.dp)
                     )
                 },
@@ -85,7 +87,81 @@ fun FileActionMenu(
                 },
                 onClick = {
                     onDismissRequest()
-                    IntentUtils.launchStreamIntent(context, streamUrl, file.isVideo, title = file.name)
+                    IntentUtils.launchStreamIntent(context, streamUrl, isVideo = false, title = file.name)
+                }
+            )
+
+            if (!file.isDir) {
+                GlassMenuDivider()
+            }
+        } else if (file.isVideo) {
+            val vlcManager = remember(context) { VlcPlayerManager.getInstance(context) }
+            val videoProgress = remember(file.rawPath) { vlcManager.getProgress(file.rawPath) }
+            val hasResume = videoProgress != null && videoProgress.positionMs >= 5000L
+
+            if (hasResume) {
+                DropdownMenuItem(
+                    text = { Text("Resume in VLC (${videoProgress.formattedPosition})", color = TextPrimary, fontSize = 13.sp) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = StreamerOrange,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    onClick = {
+                        onDismissRequest()
+                        vlcManager.launchVlc(context, file, streamUrl, resume = true)
+                    }
+                )
+
+                DropdownMenuItem(
+                    text = { Text("Play from Beginning", color = TextPrimary, fontSize = 13.sp) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Replay,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    onClick = {
+                        onDismissRequest()
+                        vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                    }
+                )
+            } else {
+                DropdownMenuItem(
+                    text = { Text("Play in VLC", color = TextPrimary, fontSize = 13.sp) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = StreamerOrange,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    onClick = {
+                        onDismissRequest()
+                        vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                    }
+                )
+            }
+
+            DropdownMenuItem(
+                text = { Text("Open in External Player", color = TextPrimary, fontSize = 13.sp) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Launch,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                onClick = {
+                    onDismissRequest()
+                    IntentUtils.launchStreamIntent(context, streamUrl, isVideo = true, title = file.name)
                 }
             )
 

@@ -1,5 +1,7 @@
 package com.codershubinc.aaxion_mob.feature.music
 
+import android.graphics.drawable.BitmapDrawable
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,8 +17,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,16 +49,32 @@ fun MusicTrackCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val artworkUrl = ArtworkResolver.findArtworkUrl(track, siblingFiles, serverUri, token)
+    val artworkUrl = remember(track.rawPath, siblingFiles) {
+        ArtworkResolver.findArtworkUrl(track, siblingFiles, serverUri, token)
+    }
+
+    // Dynamic accent color extracted from album artwork
+    val cachedAccent = remember(artworkUrl) {
+        ArtworkColorExtractor.getCachedColor(artworkUrl)
+    }
+    var dynamicAccent by remember(artworkUrl) {
+        mutableStateOf(cachedAccent ?: StreamerGreen)
+    }
+
+    val animatedAccent by animateColorAsState(
+        targetValue = dynamicAccent,
+        animationSpec = tween(450, easing = FastOutSlowInEasing),
+        label = "card_artwork_dynamic_accent"
+    )
 
     val cleanTitle = track.nameWithoutExtension.ifBlank { track.name }
     val formatBadge = track.extension.uppercase().ifBlank { "AUDIO" }
 
-    // Pulsing border highlight for actively playing track
+    // Pulsing glow border highlight for actively playing track
     val infiniteTransition = rememberInfiniteTransition(label = "pulse_border")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.35f,
-        targetValue = 0.85f,
+        targetValue = 0.90f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -67,15 +84,25 @@ fun MusicTrackCard(
 
     val cardShape = RoundedCornerShape(14.dp)
     val cardBorderColor = if (isCurrentTrack) {
-        StreamerGreen.copy(alpha = if (isPlaying) pulseAlpha else 0.45f)
+        animatedAccent.copy(alpha = if (isPlaying) pulseAlpha else 0.55f)
     } else {
-        GlassHairline
+        animatedAccent.copy(alpha = 0.16f)
     }
 
     val cardBg = if (isCurrentTrack) {
-        StreamerGreen.copy(alpha = 0.08f)
+        Brush.horizontalGradient(
+            listOf(
+                animatedAccent.copy(alpha = 0.15f),
+                AaxionCardBg
+            )
+        )
     } else {
-        AaxionCardBg
+        Brush.linearGradient(
+            listOf(
+                AaxionCardBg,
+                AaxionCardBg
+            )
+        )
     }
 
     Box(
@@ -83,7 +110,7 @@ fun MusicTrackCard(
             .fillMaxWidth()
             .clip(cardShape)
             .background(cardBg)
-            .border(if (isCurrentTrack) 1.2.dp else 0.5.dp, cardBorderColor, cardShape)
+            .border(if (isCurrentTrack) 1.4.dp else 0.6.dp, cardBorderColor, cardShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
@@ -91,15 +118,15 @@ fun MusicTrackCard(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Album Art or Audio waveform emblem
+            // Album Art or Audio waveform emblem with dynamic border glow
             Box(
                 modifier = Modifier
                     .size(52.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .background(Color.Black.copy(alpha = 0.45f))
                     .border(
-                        0.8.dp,
-                        if (isCurrentTrack) StreamerGreen.copy(alpha = 0.6f) else GlassHairline,
+                        1.dp,
+                        animatedAccent.copy(alpha = if (isCurrentTrack) 0.85f else 0.40f),
                         RoundedCornerShape(10.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -108,22 +135,34 @@ fun MusicTrackCard(
                     AsyncImage(
                         model = ImageRequest.Builder(context)
                             .data(artworkUrl)
+                            .allowHardware(false)
                             .crossfade(true)
                             .build(),
                         contentDescription = cleanTitle,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        onSuccess = { state ->
+                            val drawable = state.result.drawable
+                            if (drawable is BitmapDrawable) {
+                                val extracted = ArtworkColorExtractor.extractAccent(
+                                    bitmap = drawable.bitmap,
+                                    cacheKey = artworkUrl,
+                                    fallback = StreamerGreen
+                                )
+                                dynamicAccent = extracted
+                            }
+                        }
                     )
                 } else {
                     Icon(
                         imageVector = if (isCurrentTrack && isPlaying) Icons.Default.GraphicEq else Icons.Default.MusicNote,
                         contentDescription = null,
-                        tint = if (isCurrentTrack) StreamerGreen else TextSecondary,
+                        tint = if (isCurrentTrack) animatedAccent else animatedAccent.copy(alpha = 0.75f),
                         modifier = Modifier.size(24.dp)
                     )
                 }
 
-                // If currently playing, show miniature equalizer badge overlay
+                // If currently playing, show miniature equalizer badge overlay in dynamic color
                 if (isCurrentTrack && isPlaying) {
                     Box(
                         modifier = Modifier
@@ -131,7 +170,7 @@ fun MusicTrackCard(
                             .padding(3.dp)
                             .size(16.dp)
                             .clip(CircleShape)
-                            .background(StreamerGreen.copy(alpha = 0.9f)),
+                            .background(animatedAccent.copy(alpha = 0.95f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -146,7 +185,7 @@ fun MusicTrackCard(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Track metadata: Title, format badge, and human-readable size
+            // Track metadata: Title, dynamic format badge, and size
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -154,7 +193,7 @@ fun MusicTrackCard(
             ) {
                 Text(
                     text = cleanTitle,
-                    color = if (isCurrentTrack) StreamerGreen else TextPrimary,
+                    color = if (isCurrentTrack) animatedAccent else TextPrimary,
                     fontSize = 13.5.sp,
                     fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.SemiBold,
                     maxLines = 1,
@@ -164,16 +203,17 @@ fun MusicTrackCard(
                 Spacer(modifier = Modifier.height(3.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Format badge pill
+                    // Dynamic Format badge pill
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(if (isCurrentTrack) StreamerGreen.copy(alpha = 0.2f) else GlassSurfaceMedium)
+                            .background(animatedAccent.copy(alpha = 0.18f))
+                            .border(0.5.dp, animatedAccent.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
                             .padding(horizontal = 5.dp, vertical = 1.dp)
                     ) {
                         Text(
                             text = formatBadge,
-                            color = if (isCurrentTrack) StreamerGreen else TextTertiary,
+                            color = animatedAccent,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -189,7 +229,7 @@ fun MusicTrackCard(
                 }
             }
 
-            // Quick Play/Pause Action Button
+            // Quick Play/Pause Action Button with dynamic accent
             IconButton(
                 onClick = onPlayPauseToggle,
                 modifier = Modifier
@@ -197,16 +237,21 @@ fun MusicTrackCard(
                     .clip(CircleShape)
                     .background(
                         if (isCurrentTrack && isPlaying) {
-                            StreamerGreen.copy(alpha = 0.2f)
+                            animatedAccent.copy(alpha = 0.25f)
                         } else {
                             GlassSurfaceMedium
                         }
+                    )
+                    .border(
+                        0.6.dp,
+                        if (isCurrentTrack) animatedAccent.copy(alpha = 0.5f) else Color.Transparent,
+                        CircleShape
                     )
             ) {
                 Icon(
                     imageVector = if (isCurrentTrack && isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (isCurrentTrack && isPlaying) "Pause" else "Play",
-                    tint = if (isCurrentTrack) StreamerGreen else TextPrimary,
+                    tint = if (isCurrentTrack) animatedAccent else animatedAccent.copy(alpha = 0.85f),
                     modifier = Modifier.size(20.dp)
                 )
             }

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.codershubinc.aaxion_mob.ui.designsystem.AaxionCard
 import com.codershubinc.aaxion_mob.ui.theme.*
+import com.codershubinc.aaxion_mob.core.media.MediaPlayerManager
 import com.codershubinc.aaxion_mob.core.util.IntentUtils
 import com.codershubinc.aaxion_mob.core.network.buildStreamUrl
 import com.codershubinc.aaxion_mob.feature.drive.FileViewModel
@@ -122,7 +123,7 @@ fun StreamerMediaView(
                         backgroundColor = AaxionCardBg,
                         borderColor = if (isVideo) StreamerOrange.copy(alpha = 0.3f) else StreamerGreen.copy(alpha = 0.3f),
                         onClick = {
-                            IntentUtils.launchStreamIntent(context, streamUrl, isVideo, title = media.name)
+                            MediaPlayerManager.getInstance(context).play(media, streamUrl, token = token)
                         }
                     ) {
                         Column {

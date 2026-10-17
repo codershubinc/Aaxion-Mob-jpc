@@ -459,6 +459,11 @@ fun AaxionDriveScreen(
                 viewModel.navigateTo(serverUri, effectiveToken, targetPath, tokenManager = tokenManager)
             }
         )
+
+        // Built-in Floating Island Media Player (background streaming + capsule / card viewer)
+        FloatingIslandPlayer(
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }
 

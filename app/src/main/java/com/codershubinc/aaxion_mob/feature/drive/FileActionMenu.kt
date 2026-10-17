@@ -6,10 +6,12 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.DropdownMenuItem
+import com.codershubinc.aaxion_mob.core.media.MediaPlayerManager
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,7 +58,7 @@ fun FileActionMenu(
     ) {
         if (file.isVideo || file.isAudio) {
             DropdownMenuItem(
-                text = { Text("Stream Now", color = TextPrimary, fontSize = 13.sp) },
+                text = { Text("Play in Island", color = TextPrimary, fontSize = 13.sp) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
@@ -67,9 +69,26 @@ fun FileActionMenu(
                 },
                 onClick = {
                     onDismissRequest()
+                    MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token)
+                }
+            )
+
+            DropdownMenuItem(
+                text = { Text("Open in External Player", color = TextPrimary, fontSize = 13.sp) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Launch,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                onClick = {
+                    onDismissRequest()
                     IntentUtils.launchStreamIntent(context, streamUrl, file.isVideo, title = file.name)
                 }
             )
+
             if (!file.isDir) {
                 GlassMenuDivider()
             }

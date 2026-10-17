@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.codershubinc.aaxion_mob.core.media.MediaPlayerManager
 import com.codershubinc.aaxion_mob.core.model.FileItem
 import com.codershubinc.aaxion_mob.core.network.buildStreamUrl
 import com.codershubinc.aaxion_mob.core.network.buildThumbUrl
@@ -149,15 +150,15 @@ fun FileListItem(
                 }
             }
 
-            // Quick Stream / Download Action
+            // Quick Stream Action (Floating Island)
             if (isVideo || isAudio) {
                 IconButton(
-                    onClick = { IntentUtils.launchStreamIntent(context, streamUrl, isVideo, title = file.name) },
+                    onClick = { MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token) },
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Stream",
+                        contentDescription = "Play in Floating Island",
                         tint = if (isVideo) StreamerOrange else StreamerGreen,
                         modifier = Modifier.size(18.dp)
                     )

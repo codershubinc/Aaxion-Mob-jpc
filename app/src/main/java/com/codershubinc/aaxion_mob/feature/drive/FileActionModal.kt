@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.codershubinc.aaxion_mob.core.media.MediaPlayerManager
 import com.codershubinc.aaxion_mob.core.model.FileItem
 import com.codershubinc.aaxion_mob.core.network.buildDownloadUrl
 import com.codershubinc.aaxion_mob.core.network.buildStreamUrl
@@ -170,15 +171,27 @@ fun FileActionModal(
                         onClick = onOpen
                     )
 
-                    // Stream Action (For Video/Audio)
+                    // Stream Actions (Floating Island & External Player)
                     if (file.isVideo || file.isAudio) {
                         InsetGlassDivider(startIndent = 56.dp)
                         val streamColor = if (file.isVideo) StreamerOrange else StreamerGreen
                         ModalActionItem(
                             icon = Icons.Default.PlayArrow,
-                            title = if (file.isVideo) "Stream Video (VLC)" else "Play Audio Stream (VLC)",
-                            subtitle = "Stream instantly via VLC or external media player",
+                            title = if (file.isVideo) "Play in Floating Island" else "Play in Floating Island",
+                            subtitle = "Continuous in-app playback with capsule & player card",
                             accentColor = streamColor,
+                            onClick = {
+                                onDismiss()
+                                MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token)
+                            }
+                        )
+
+                        InsetGlassDivider(startIndent = 56.dp)
+                        ModalActionItem(
+                            icon = Icons.AutoMirrored.Filled.Launch,
+                            title = if (file.isVideo) "Stream in External Player" else "Stream Audio Externally",
+                            subtitle = "Open stream via external player (e.g. VLC)",
+                            accentColor = TextSecondary,
                             onClick = {
                                 onDismiss()
                                 IntentUtils.launchStreamIntent(context, streamUrl, file.isVideo, title = file.name)

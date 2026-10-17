@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.codershubinc.aaxion_mob.core.data.TokenManager
 import com.codershubinc.aaxion_mob.core.model.FileItem
+import com.codershubinc.aaxion_mob.core.media.MediaPlayerManager
 import com.codershubinc.aaxion_mob.core.network.buildDownloadUrl
 import com.codershubinc.aaxion_mob.core.network.buildImageViewUrl
 import com.codershubinc.aaxion_mob.core.network.buildStreamUrl
@@ -165,7 +166,7 @@ fun DriveFilesView(
                                     viewModel.navigateTo(serverUri, token, file.rawPath, tokenManager = tokenManager)
                                 } else if (file.isVideo || file.isAudio) {
                                     val streamUrl = file.buildStreamUrl(serverUri, token)
-                                    IntentUtils.launchStreamIntent(context, streamUrl, file.isVideo, title = file.name)
+                                    MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token)
                                 } else if (canOpenFileInViewer(file)) {
                                     activeViewingFile = file
                                 } else {
@@ -197,7 +198,7 @@ fun DriveFilesView(
                                     viewModel.navigateTo(serverUri, token, file.rawPath, tokenManager = tokenManager)
                                 } else if (file.isVideo || file.isAudio) {
                                     val streamUrl = file.buildStreamUrl(serverUri, token)
-                                    IntentUtils.launchStreamIntent(context, streamUrl, file.isVideo, title = file.name)
+                                    MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token)
                                 } else if (canOpenFileInViewer(file)) {
                                     activeViewingFile = file
                                 } else {

@@ -60,7 +60,7 @@ object IntentUtils {
     }
 
     /**
-     * Enqueues a download using Android's native DownloadManager with notifications,
+     * Enqueues a download using system DownloadManager with notifications,
      * falling back to browser intent if needed.
      */
     fun launchDownloadIntent(

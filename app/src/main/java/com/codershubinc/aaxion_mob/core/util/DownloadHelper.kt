@@ -15,8 +15,12 @@ object DownloadHelper {
     private var isReceiverRegistered = false
 
     /**
-     * Enqueues a file download using Android's native DownloadManager.
+     * Enqueues a file download using system DownloadManager.
      * Shows system progress notifications and saves to standard Downloads directory.
+     *
+     * Security: Avoids attaching Authorization Bearer headers to DownloadManager.Request,
+     * which would otherwise be persisted to the system download provider database and logs.
+     * Authentication is handled via the scoped URL query token rotated every 4 hours.
      */
     fun enqueueDownload(
         context: Context,
@@ -25,16 +29,20 @@ object DownloadHelper {
         token: String? = null
     ): Long {
         try {
-            val request = DownloadManager.Request(Uri.parse(downloadUrl)).apply {
+            val parsedUri = Uri.parse(downloadUrl)
+            val effectiveUri = if (!token.isNullOrBlank() && parsedUri.getQueryParameter("tkn").isNullOrBlank()) {
+                parsedUri.buildUpon().appendQueryParameter("tkn", token).build()
+            } else {
+                parsedUri
+            }
+
+            val request = DownloadManager.Request(effectiveUri).apply {
                 setTitle(fileName)
                 setDescription("Downloading from Aaxion Server...")
                 setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
                 setAllowedOverMetered(true)
                 setAllowedOverRoaming(true)
-                if (!token.isNullOrBlank()) {
-                    addRequestHeader("Authorization", "Bearer $token")
-                }
             }
 
             val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager

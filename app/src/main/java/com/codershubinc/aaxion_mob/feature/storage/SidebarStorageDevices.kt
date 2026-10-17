@@ -291,7 +291,7 @@ private fun StorageVolumeTile(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "${IntentUtils.formatFileSize(usedBytes)} / ${IntentUtils.formatFileSize(totalBytes)}",
+                text = "${IntentUtils.formatFileSize(usedBytes)} used",
                 color = TextSecondary,
                 fontSize = 9.5.sp,
                 fontWeight = FontWeight.Medium

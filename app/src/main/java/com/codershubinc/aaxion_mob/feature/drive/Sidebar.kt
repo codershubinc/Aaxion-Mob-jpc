@@ -126,7 +126,7 @@ fun SidebarContent(
     modifier: Modifier = Modifier
 ) {
     val accentColor = LocalAccentColor.current
-    val sidebarShape = RoundedCornerShape(16.dp)
+    val sidebarShape = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp)
 
     Column(
         modifier = modifier
@@ -134,17 +134,16 @@ fun SidebarContent(
             .navigationBarsPadding()
             .width(260.dp)
             .fillMaxHeight()
-            .padding(8.dp)
             .clip(sidebarShape)
             .background(GlassBrushes.glassSurface())
             .border(
-                width = 1.dp,
-                brush = GlassBrushes.specularBorder(accentColor),
+                width = 0.5.dp,
+                color = GlassHairline,
                 shape = sidebarShape
             )
             .padding(12.dp)
     ) {
-        // ZONE 1: Top Zone (Fixed)
+        // Top Block (Fixed): Logo header + navigation links
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -219,7 +218,7 @@ fun SidebarContent(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Navigation Items (Drive, Streamer, Storage & Hub)
+            // Navigation Items (Drive, Music, Storage & Hub)
             TabletSidebarItem(
                 icon = Icons.Default.Folder,
                 label = "My Drive",
@@ -245,31 +244,30 @@ fun SidebarContent(
             )
         }
 
-        // Flexible Spacer pushing storage devices and settings to the bottom
-        Spacer(modifier = Modifier.weight(1f))
+        // Middle Block (Scrollable): Storage header & devices list
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            SidebarStorageDevices(
+                serverUri = activeServerUri,
+                token = effectiveToken,
+                onSelectStorageDevice = onSelectStorageDevice,
+                onStorageTitleClick = { onTabSelected(2) }
+            )
+        }
 
-        // Bottom Zone: Compact Storage Devices & Settings
-        Column(modifier = Modifier.fillMaxWidth()) {
+        // Bottom Block (Fixed): Divider + Settings
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
             HorizontalDivider(color = GlassHairline, thickness = 0.5.dp)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-            ) {
-                SidebarStorageDevices(
-                    serverUri = activeServerUri,
-                    token = effectiveToken,
-                    onSelectStorageDevice = onSelectStorageDevice,
-                    onStorageTitleClick = { onTabSelected(2) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(color = GlassHairline, thickness = 0.5.dp)
-            Spacer(modifier = Modifier.height(8.dp))
-
+            Spacer(modifier = Modifier.height(12.dp))
             TabletSidebarItem(
                 icon = Icons.Default.Settings,
                 label = "Settings",

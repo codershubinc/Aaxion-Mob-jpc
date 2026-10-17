@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material3.DropdownMenuItem
@@ -112,7 +113,7 @@ fun FileActionMenu(
                     },
                     onClick = {
                         onDismissRequest()
-                        vlcManager.launchVlc(context, file, streamUrl, resume = true)
+                        vlcManager.launchVlc(context, file, streamUrl, resume = true, token = token)
                     }
                 )
 
@@ -128,7 +129,7 @@ fun FileActionMenu(
                     },
                     onClick = {
                         onDismissRequest()
-                        vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                        vlcManager.launchVlc(context, file, streamUrl, resume = false, token = token)
                     }
                 )
             } else {
@@ -144,10 +145,26 @@ fun FileActionMenu(
                     },
                     onClick = {
                         onDismissRequest()
-                        vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                        vlcManager.launchVlc(context, file, streamUrl, resume = false, token = token)
                     }
                 )
             }
+
+            DropdownMenuItem(
+                text = { Text("Video Stats in Floating Island", color = TextPrimary, fontSize = 13.sp) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = StreamerOrange,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                onClick = {
+                    onDismissRequest()
+                    vlcManager.inspectVideo(file, streamUrl, token = token)
+                }
+            )
 
             DropdownMenuItem(
                 text = { Text("Play in Internal Player", color = TextPrimary, fontSize = 13.sp) },

@@ -190,7 +190,7 @@ fun DriveFilesView(
                                     if (progress != null && progress.positionMs >= 5000L) {
                                         pendingResumeVideo = Triple(file, streamUrl, progress)
                                     } else {
-                                        vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                                        vlcManager.launchVlc(context, file, streamUrl, resume = false, token = token)
                                     }
                                 } else if (canOpenFileInViewer(file)) {
                                     activeViewingFile = file
@@ -237,7 +237,7 @@ fun DriveFilesView(
                                     if (progress != null && progress.positionMs >= 5000L) {
                                         pendingResumeVideo = Triple(file, streamUrl, progress)
                                     } else {
-                                        vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                                        vlcManager.launchVlc(context, file, streamUrl, resume = false, token = token)
                                     }
                                 } else if (canOpenFileInViewer(file)) {
                                     activeViewingFile = file
@@ -282,11 +282,11 @@ fun DriveFilesView(
             file = file,
             progress = progress,
             onResume = {
-                VlcPlayerManager.getInstance(context).launchVlc(context, file, streamUrl, resume = true)
+                VlcPlayerManager.getInstance(context).launchVlc(context, file, streamUrl, resume = true, token = token)
                 pendingResumeVideo = null
             },
             onStartOver = {
-                VlcPlayerManager.getInstance(context).launchVlc(context, file, streamUrl, resume = false)
+                VlcPlayerManager.getInstance(context).launchVlc(context, file, streamUrl, resume = false, token = token)
                 pendingResumeVideo = null
             },
             onPlayInternal = {
@@ -297,6 +297,10 @@ fun DriveFilesView(
                     baseUrl = serverUri,
                     siblingFiles = viewModel.files
                 )
+                pendingResumeVideo = null
+            },
+            onInspectIsland = {
+                VlcPlayerManager.getInstance(context).inspectVideo(file, streamUrl, token = token)
                 pendingResumeVideo = null
             },
             onDismiss = { pendingResumeVideo = null }

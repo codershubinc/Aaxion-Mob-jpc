@@ -7,15 +7,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -23,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.codershubinc.aaxion_mob.core.data.VideoMetadataCacheDb
 import com.codershubinc.aaxion_mob.core.media.VideoProgress
 import com.codershubinc.aaxion_mob.core.model.FileItem
 import com.codershubinc.aaxion_mob.ui.designsystem.GlassButton
@@ -35,9 +39,14 @@ fun VideoResumeModal(
     onResume: () -> Unit,
     onStartOver: () -> Unit,
     onPlayInternal: (() -> Unit)? = null,
+    onInspectIsland: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val dialogShape = RoundedCornerShape(24.dp)
+    val cachedMeta = remember(file.rawPath) {
+        VideoMetadataCacheDb.getInstance(context).get(file.rawPath)
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -132,7 +141,61 @@ fun VideoResumeModal(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(22.dp))
+                // Video Metadata Stats Pills
+                if (cachedMeta != null && (cachedMeta.resolutionLabel.isNotEmpty() || cachedMeta.formattedBitrate.isNotEmpty())) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (cachedMeta.resolutionLabel.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .border(0.5.dp, GlassHairline, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 7.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = cachedMeta.resolutionLabel,
+                                    color = Color.White,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        if (cachedMeta.formattedBitrate.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .border(0.5.dp, GlassHairline, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 7.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = cachedMeta.formattedBitrate,
+                                    color = TextSecondary,
+                                    fontSize = 10.5.sp
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(StreamerGreen.copy(alpha = 0.14f))
+                                .padding(horizontal = 7.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "DB Cached",
+                                color = StreamerGreen,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Action 1: Resume from last watched position
                 GlassButton(
@@ -176,6 +239,23 @@ fun VideoResumeModal(
                         icon = Icons.Default.PlayArrow,
                         isPrimary = false,
                         accentColor = TextSecondary,
+                        cornerRadius = 14.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                if (onInspectIsland != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    GlassButton(
+                        text = "Inspect Video Stats in Island",
+                        onClick = {
+                            onDismiss()
+                            onInspectIsland()
+                        },
+                        icon = Icons.Default.Info,
+                        isPrimary = false,
+                        accentColor = StreamerOrange,
                         cornerRadius = 14.dp,
                         modifier = Modifier.fillMaxWidth()
                     )

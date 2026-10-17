@@ -39,8 +39,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.codershubinc.aaxion_mob.core.data.VideoPlaybackMeta
 import com.codershubinc.aaxion_mob.core.media.MediaPlayerManager
 import com.codershubinc.aaxion_mob.core.media.MediaPlaybackState
+import com.codershubinc.aaxion_mob.core.media.VlcPlaybackSession
+import com.codershubinc.aaxion_mob.core.media.VlcPlayerManager
 import com.codershubinc.aaxion_mob.core.util.IntentUtils
 import com.codershubinc.aaxion_mob.ui.theme.*
 import java.util.Locale
@@ -63,7 +66,8 @@ fun formatTimeMs(ms: Long): String {
 
 /**
  * In-built Media Player that doubles as a Floating Island capsule / card docked at the bottom.
- * Plays audio & video continuously in the background while users explore files.
+ * Plays audio & video continuously in the background while users explore files,
+ * and tracks video sessions, playback stats, and metadata.
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -74,10 +78,20 @@ fun FloatingIslandPlayer(
     val manager = remember { MediaPlayerManager.getInstance(context) }
     val state by manager.state.collectAsState()
 
-    if (!state.isVisible || state.currentFile == null) return
+    val vlcManager = remember { VlcPlayerManager.getInstance(context) }
+    val vlcSession by vlcManager.activeSession.collectAsState()
+
+    val hasInternal = state.isVisible && state.currentFile != null
+    val hasVlc = vlcSession != null && vlcSession?.isVisible == true
+
+    if (!hasInternal && !hasVlc) return
 
     val themeAccent = LocalAccentColor.current
-    val mediaAccent = if (state.isVideo) StreamerOrange else StreamerGreen
+    val mediaAccent = if (hasInternal) {
+        if (state.isVideo) StreamerOrange else StreamerGreen
+    } else {
+        StreamerOrange
+    }
 
     val configuration = LocalConfiguration.current
     val isMobile = configuration.screenWidthDp < 768
@@ -85,32 +99,67 @@ fun FloatingIslandPlayer(
     // Position above navigation dock when collapsed
     val bottomMargin = if (isMobile) 86.dp else 16.dp
 
-    // Compact floating island capsule (visible when not expanded)
-    AnimatedVisibility(
-        visible = state.isVisible && !state.isExpanded,
-        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(tween(250)),
-        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(tween(200)),
-        modifier = modifier
-            .navigationBarsPadding()
-            .padding(horizontal = 12.dp)
-            .padding(bottom = bottomMargin)
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.BottomCenter
+    var isVlcExpanded by remember { mutableStateOf(false) }
+
+    // 1. Internal Player Compact Island
+    if (hasInternal) {
+        AnimatedVisibility(
+            visible = state.isVisible && !state.isExpanded,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(tween(250)),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(tween(200)),
+            modifier = modifier
+                .navigationBarsPadding()
+                .padding(horizontal = 12.dp)
+                .padding(bottom = bottomMargin)
         ) {
-            CompactIslandView(
-                state = state,
-                accentColor = mediaAccent,
-                onTogglePlay = { manager.togglePlayPause() },
-                onExpand = { manager.setExpanded(true) },
-                onClose = { manager.close() }
-            )
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                CompactIslandView(
+                    state = state,
+                    accentColor = mediaAccent,
+                    onTogglePlay = { manager.togglePlayPause() },
+                    onExpand = { manager.setExpanded(true) },
+                    onClose = { manager.close() }
+                )
+            }
+        }
+    } else if (hasVlc && vlcSession != null) {
+        // 2. Video Stats Floating Island Capsule
+        AnimatedVisibility(
+            visible = !isVlcExpanded,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(tween(250)),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(tween(200)),
+            modifier = modifier
+                .navigationBarsPadding()
+                .padding(horizontal = 12.dp)
+                .padding(bottom = bottomMargin)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                CompactVideoIslandView(
+                    session = vlcSession!!,
+                    accentColor = StreamerOrange,
+                    onResume = {
+                        vlcManager.launchVlc(
+                            context = context,
+                            file = vlcSession!!.file,
+                            streamUrl = vlcSession!!.streamUrl,
+                            resume = true
+                        )
+                    },
+                    onExpand = { isVlcExpanded = true },
+                    onClose = { vlcManager.dismissSession() }
+                )
+            }
         }
     }
 
-    // Expanded player bottom sheet with 75% dark scrim
-    if (state.isExpanded) {
+    // Expanded Internal Player Sheet
+    if (hasInternal && state.isExpanded) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             onDismissRequest = { manager.setExpanded(false) },
@@ -143,6 +192,44 @@ fun FloatingIslandPlayer(
                                     title = file.name
                                 )
                             }
+                        }
+                    )
+                }
+            }
+        )
+    }
+
+    // Expanded Video Stats & Metadata HUD Sheet
+    if (!hasInternal && hasVlc && isVlcExpanded && vlcSession != null) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { isVlcExpanded = false },
+            sheetState = sheetState,
+            containerColor = Color(0xFF0C0C10).copy(alpha = 0.98f),
+            scrimColor = Color.Black.copy(alpha = 0.75f),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = null,
+            modifier = Modifier.widthIn(max = 560.dp),
+            content = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(bottom = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ExpandedVideoStatsHud(
+                        session = vlcSession!!,
+                        vlcManager = vlcManager,
+                        accentColor = StreamerOrange,
+                        onDismiss = { isVlcExpanded = false },
+                        onPlayInternal = {
+                            isVlcExpanded = false
+                            vlcManager.dismissSession()
+                            MediaPlayerManager.getInstance(context).play(
+                                file = vlcSession!!.file,
+                                streamUrl = vlcSession!!.streamUrl
+                            )
                         }
                     )
                 }
@@ -1028,3 +1115,615 @@ private fun AnimatedAudioWaveVisualizer(
         }
     }
 }
+
+/**
+ * Helper to format timestamps into relative elapsed time strings.
+ */
+private fun formatTimeAgo(ts: Long): String {
+    val diff = (System.currentTimeMillis() - ts).coerceAtLeast(0L)
+    val seconds = diff / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "${minutes}m ago"
+        hours < 24 -> "${hours}h ago"
+        else -> "${hours / 24}d ago"
+    }
+}
+
+/**
+ * Compact spatial glass floating island capsule for video playback sessions.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CompactVideoIslandView(
+    session: VlcPlaybackSession,
+    accentColor: Color,
+    onResume: () -> Unit,
+    onExpand: () -> Unit,
+    onClose: () -> Unit
+) {
+    val islandShape = RoundedCornerShape(27.dp)
+    val fileName = session.meta.title.ifEmpty { session.file.name }
+    val resolution = session.meta.resolutionLabel
+    val isPlaying = session.isPlayingInVlc
+
+    Box(
+        modifier = Modifier
+            .widthIn(min = 260.dp, max = 460.dp)
+            .fillMaxWidth()
+            .height(56.dp)
+            .drawBehind {
+                val glowRadius = size.maxDimension * 0.75f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            accentColor.copy(alpha = 0.32f),
+                            accentColor.copy(alpha = 0.12f),
+                            Color.Transparent
+                        ),
+                        center = center,
+                        radius = glowRadius
+                    )
+                )
+            }
+            .clip(islandShape)
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.45f),
+                        accentColor.copy(alpha = 0.40f),
+                        Color.White.copy(alpha = 0.12f)
+                    )
+                ),
+                shape = islandShape
+            )
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { _, dragAmount ->
+                    if (dragAmount < -12f) {
+                        onExpand()
+                    }
+                }
+            }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onExpand
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .blur(16.dp)
+                .background(accentColor.copy(alpha = 0.22f), islandShape)
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF1E2230).copy(alpha = 0.55f),
+                            Color(0xFF0F121A).copy(alpha = 0.65f)
+                        )
+                    ),
+                    islandShape
+                )
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth(0.92f)
+                .height(1.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.50f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Left: Video Icon + Active Pulsing / Probing Badge
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(accentColor.copy(alpha = 0.18f))
+                    .border(0.8.dp, accentColor.copy(alpha = 0.45f), RoundedCornerShape(9.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Videocam,
+                    contentDescription = "Video",
+                    tint = accentColor,
+                    modifier = Modifier.size(20.dp)
+                )
+                if (session.isProbing) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(2.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = accentColor,
+                            strokeWidth = 1.5.dp,
+                            modifier = Modifier.size(9.dp)
+                        )
+                    }
+                } else if (isPlaying) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(2.dp)
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(accentColor)
+                    )
+                }
+            }
+
+            // Center: Marquee Title + Stats (Position / Duration, Resolution Badge)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = fileName,
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    modifier = Modifier.basicMarquee()
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val statusLabel = if (isPlaying) "Playing" else "Paused"
+                    val timeText = if (session.meta.durationMs > 0L) {
+                        "$statusLabel • ${session.meta.formattedPosition} / ${session.meta.formattedDuration}"
+                    } else {
+                        "$statusLabel • ${session.meta.formattedPosition}"
+                    }
+                    Text(
+                        text = timeText,
+                        color = if (isPlaying) accentColor else TextSecondary,
+                        fontSize = 10.sp,
+                        fontWeight = if (isPlaying) FontWeight.Medium else FontWeight.Normal
+                    )
+
+                    if (session.meta.durationMs > 0L) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "(${session.meta.percentWatched}%)",
+                            color = accentColor,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (resolution.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(accentColor.copy(alpha = 0.20f))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                text = resolution,
+                                color = accentColor,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    if (session.meta.formattedBitrate.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = session.meta.formattedBitrate,
+                            color = TextTertiary,
+                            fontSize = 8.5.sp
+                        )
+                    }
+                }
+            }
+
+            // Right: Expand/Info Button, Resume Button, Close Button
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onExpand,
+                    modifier = Modifier.size(30.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Video Stats",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onResume,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "Resume",
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Dismiss",
+                        tint = TextTertiary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+
+        // Bottom edge live progress bar indicator
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .height(2.5.dp)
+                .background(Color.White.copy(alpha = 0.08f))
+        ) {
+            if (session.meta.progressFraction > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(session.meta.progressFraction)
+                        .fillMaxHeight()
+                        .background(accentColor)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Expanded bottom sheet HUD displaying full video streaming statistics and database cache state.
+ */
+@Composable
+private fun ExpandedVideoStatsHud(
+    session: VlcPlaybackSession,
+    vlcManager: VlcPlayerManager,
+    accentColor: Color,
+    onDismiss: () -> Unit,
+    onPlayInternal: () -> Unit
+) {
+    val context = LocalContext.current
+    val meta = session.meta
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Top Drag Pill
+        Box(
+            modifier = Modifier
+                .width(36.dp)
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.25f))
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Header Row: Icon + Title + Close Button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(accentColor.copy(alpha = 0.18f))
+                        .border(0.8.dp, accentColor.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Videocam,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column {
+                    Text(
+                        text = "Video Stats & Metadata",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "VLC Session • SQLite DB Cache",
+                        color = TextSecondary,
+                        fontSize = 11.5.sp
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(GlassSurfaceLow)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = TextSecondary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Main File Info Card
+        InsetGroupedGlassCard(accentHighlight = accentColor) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp)
+            ) {
+                Text(
+                    text = meta.title.ifEmpty { session.file.name },
+                    color = TextPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = meta.rawPath,
+                    color = TextTertiary,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Progress Bar with Gradient
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color.White.copy(alpha = 0.08f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(meta.progressFraction)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(accentColor, Color(0xFFFF8A65))
+                                )
+                            )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    val posLabel = if (meta.durationMs > 0L) {
+                        "Position: ${meta.formattedPosition} (${meta.percentWatched}%)"
+                    } else {
+                        "Position: ${meta.formattedPosition} (Live)"
+                    }
+                    Text(
+                        text = posLabel,
+                        color = accentColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Total: ${meta.formattedDuration.ifEmpty { "Detecting..." }}",
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // 2x2 Stats Grid: InsetGroupedGlassCard
+        InsetGroupedGlassCard {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Row 1: Resolution & Bitrate
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    StatMetricColumn(
+                        label = "RESOLUTION",
+                        value = meta.resolutionLabel.ifEmpty { if (session.isProbing) "Detecting..." else "Standard" },
+                        detail = if (meta.dimensionsText.isNotEmpty()) "${meta.dimensionsText} (${meta.aspectRatioText})" else "Pending probe",
+                        accentColor = accentColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatMetricColumn(
+                        label = "STREAM BITRATE",
+                        value = meta.formattedBitrate.ifEmpty { if (session.isProbing) "Probing..." else "Adaptive" },
+                        detail = meta.mimeType.ifEmpty { "video/stream" },
+                        accentColor = accentColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                InsetGlassDivider(startIndent = 14.dp)
+
+                // Row 2: File Size & Cache / Tracking Status
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    StatMetricColumn(
+                        label = "FILE SIZE",
+                        value = if (meta.fileSize > 0L) IntentUtils.formatFileSize(meta.fileSize) else IntentUtils.formatFileSize(session.file.size),
+                        detail = "Remote Stream",
+                        accentColor = accentColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatMetricColumn(
+                        label = "PLAYBACK STATUS",
+                        value = if (session.isPlayingInVlc) "Active in VLC" else "Paused",
+                        detail = if (session.isPlayingInVlc) "Live tracking active" else "DB Synced (${formatTimeAgo(meta.lastWatchedTs)})",
+                        accentColor = if (session.isPlayingInVlc) accentColor else StreamerGreen,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // Action Buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            GlassButton(
+                text = "Resume in VLC",
+                onClick = {
+                    onDismiss()
+                    vlcManager.launchVlc(
+                        context = context,
+                        file = session.file,
+                        streamUrl = session.streamUrl,
+                        resume = true
+                    )
+                },
+                icon = Icons.Default.PlayArrow,
+                isPrimary = true,
+                accentColor = accentColor,
+                modifier = Modifier.weight(1f)
+            )
+
+            GlassButton(
+                text = "Internal Player",
+                onClick = onPlayInternal,
+                icon = Icons.Default.PlayArrow,
+                isPrimary = false,
+                accentColor = TextSecondary,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Secondary Utility Actions: Clear Progress or Dismiss
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(
+                onClick = {
+                    vlcManager.clearProgress(session.rawPath)
+                    onDismiss()
+                }
+            ) {
+                Text(
+                    text = "Clear Saved Position",
+                    color = AaxionDanger,
+                    fontSize = 12.sp
+                )
+            }
+
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(
+                    text = "Dismiss Island",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Stat column layout for inspection grid in the video stats HUD.
+ */
+@Composable
+private fun StatMetricColumn(
+    label: String,
+    value: String,
+    detail: String,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            color = TextTertiary,
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = value,
+            color = TextPrimary,
+            fontSize = 13.5.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(1.dp))
+        Text(
+            text = detail,
+            color = accentColor.copy(alpha = 0.85f),
+            fontSize = 10.5.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+

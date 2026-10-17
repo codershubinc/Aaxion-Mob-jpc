@@ -210,7 +210,7 @@ fun FileActionModal(
                                 accentColor = StreamerOrange,
                                 onClick = {
                                     onDismiss()
-                                    vlcManager.launchVlc(context, file, streamUrl, resume = true)
+                                    vlcManager.launchVlc(context, file, streamUrl, resume = true, token = token)
                                 }
                             )
 
@@ -222,7 +222,7 @@ fun FileActionModal(
                                 accentColor = TextSecondary,
                                 onClick = {
                                     onDismiss()
-                                    vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                                    vlcManager.launchVlc(context, file, streamUrl, resume = false, token = token)
                                 }
                             )
                         } else {
@@ -234,10 +234,22 @@ fun FileActionModal(
                                 accentColor = StreamerOrange,
                                 onClick = {
                                     onDismiss()
-                                    vlcManager.launchVlc(context, file, streamUrl, resume = false)
+                                    vlcManager.launchVlc(context, file, streamUrl, resume = false, token = token)
                                 }
                             )
                         }
+
+                        InsetGlassDivider(startIndent = 56.dp)
+                        ModalActionItem(
+                            icon = Icons.Default.Info,
+                            title = "Video Stats in Floating Island",
+                            subtitle = "Inspect resolution, bitrate, and SQLite DB cache metrics",
+                            accentColor = StreamerOrange,
+                            onClick = {
+                                onDismiss()
+                                vlcManager.inspectVideo(file, streamUrl, token = token)
+                            }
+                        )
 
                         InsetGlassDivider(startIndent = 56.dp)
                         ModalActionItem(

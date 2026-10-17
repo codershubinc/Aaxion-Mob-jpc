@@ -62,19 +62,33 @@ class MainActivity : ComponentActivity() {
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val intentData = result.data
-        val returnedPosition = intentData?.getLongExtra("extra_position", -1L)
-            ?: intentData?.getLongExtra("position", -1L)
-            ?: intentData?.getLongExtra("result_position", -1L)
+        val returnedPosition = intentData?.getFlexibleLong("extra_position")
+            ?: intentData?.getFlexibleLong("position")
+            ?: intentData?.getFlexibleLong("result_position")
+            ?: intentData?.getFlexibleLong("time")
+            ?: intentData?.getFlexibleLong("current_time")
             ?: -1L
 
-        val returnedDuration = intentData?.getLongExtra("extra_duration", 0L)
-            ?: intentData?.getLongExtra("duration", 0L)
+        val returnedDuration = intentData?.getFlexibleLong("extra_duration", 0L)
+            ?: intentData?.getFlexibleLong("duration", 0L)
+            ?: intentData?.getFlexibleLong("length", 0L)
             ?: 0L
 
         com.codershubinc.aaxion_mob.core.media.VlcPlayerManager.getInstance(applicationContext).handleActivityResult(
             positionMs = returnedPosition,
             durationMs = returnedDuration
         )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun android.content.Intent.getFlexibleLong(key: String, default: Long = -1L): Long {
+        val bundle = extras ?: return default
+        val value = bundle.get(key) ?: return default
+        return when (value) {
+            is Number -> value.toLong()
+            is String -> value.toLongOrNull() ?: default
+            else -> default
+        }
     }
 
     companion object {

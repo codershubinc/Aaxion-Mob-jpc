@@ -150,6 +150,22 @@ fun FileActionMenu(
             }
 
             DropdownMenuItem(
+                text = { Text("Play in Internal Player", color = TextPrimary, fontSize = 13.sp) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = StreamerOrange,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                onClick = {
+                    onDismissRequest()
+                    MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token, baseUrl = baseUrl)
+                }
+            )
+
+            DropdownMenuItem(
                 text = { Text("Open in External Player", color = TextPrimary, fontSize = 13.sp) },
                 leadingIcon = {
                     Icon(

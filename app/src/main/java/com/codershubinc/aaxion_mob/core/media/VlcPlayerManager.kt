@@ -73,6 +73,7 @@ class VlcPlayerManager private constructor(private val context: Context) {
             .apply()
 
         _progressUpdates.value = _progressUpdates.value + (rawPath to safePos)
+        RecentPlaybackManager.getInstance(context).updateProgress(rawPath, safePos, durationMs)
     }
 
     fun clearProgress(rawPath: String) {
@@ -109,6 +110,20 @@ class VlcPlayerManager private constructor(private val context: Context) {
         } else {
             0L
         }
+
+        RecentPlaybackManager.getInstance(context).recordPlayback(
+            RecentMediaItem(
+                id = rawPath,
+                title = file.displayName(40),
+                subtitle = "Video",
+                rawPath = rawPath,
+                isVideo = true,
+                isAudio = false,
+                durationMs = 0L,
+                progressMs = startPositionMs,
+                size = file.size
+            )
+        )
 
         activeSession = ActiveVideoSession(
             rawPath = rawPath,

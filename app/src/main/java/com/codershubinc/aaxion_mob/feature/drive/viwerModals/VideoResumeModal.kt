@@ -34,6 +34,7 @@ fun VideoResumeModal(
     progress: VideoProgress,
     onResume: () -> Unit,
     onStartOver: () -> Unit,
+    onPlayInternal: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val dialogShape = RoundedCornerShape(24.dp)
@@ -162,6 +163,23 @@ fun VideoResumeModal(
                     cornerRadius = 14.dp,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                if (onPlayInternal != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    GlassButton(
+                        text = "Play in Internal Player",
+                        onClick = {
+                            onDismiss()
+                            onPlayInternal()
+                        },
+                        icon = Icons.Default.PlayArrow,
+                        isPrimary = false,
+                        accentColor = TextSecondary,
+                        cornerRadius = 14.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }

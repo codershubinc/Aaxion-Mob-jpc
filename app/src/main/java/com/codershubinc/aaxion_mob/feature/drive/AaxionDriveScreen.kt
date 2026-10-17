@@ -68,6 +68,7 @@ import com.codershubinc.aaxion_mob.core.network.ServerPingHelper
 import com.codershubinc.aaxion_mob.core.util.IntentUtils
 import com.codershubinc.aaxion_mob.feature.settings.SettingsScreen
 import com.codershubinc.aaxion_mob.feature.music.MusicView
+import com.codershubinc.aaxion_mob.feature.home.HomeScreen
 import com.codershubinc.aaxion_mob.feature.storage.StorageAndHubView
 import com.codershubinc.aaxion_mob.feature.storage.StorageInfoTile
 import com.codershubinc.aaxion_mob.ui.designsystem.AaxionCard
@@ -132,8 +133,8 @@ fun AaxionDriveScreen(
         enabled = playerState.isExpanded ||
                 (isSidebarVisible && !isDesktop) ||
                 viewModel.searchQuery.isNotBlank() ||
-                currentTab != 0 ||
-                viewModel.canNavigateUp
+                (currentTab == 1 && viewModel.canNavigateUp) ||
+                currentTab != 0
     ) {
         if (playerState.isExpanded) {
             playerManager.setExpanded(false)
@@ -141,10 +142,10 @@ fun AaxionDriveScreen(
             isSidebarVisible = false
         } else if (viewModel.searchQuery.isNotBlank()) {
             viewModel.searchQuery = ""
+        } else if (currentTab == 1 && viewModel.canNavigateUp) {
+            viewModel.navigateUp(activeServerUri, effectiveToken, tokenManager = tokenManager)
         } else if (currentTab != 0) {
             currentTab = 0
-        } else if (viewModel.canNavigateUp) {
-            viewModel.navigateUp(activeServerUri, effectiveToken, tokenManager = tokenManager)
         }
     }
 
@@ -225,7 +226,24 @@ fun AaxionDriveScreen(
                         .padding(start = if (isDesktop && isSidebarVisible) 268.dp else 0.dp)
                 ) {
                     when (currentTab) {
-                        0 -> DriveFilesView(
+                        0 -> HomeScreen(
+                            serverUri = activeServerUri,
+                            token = effectiveToken,
+                            onNavigateToDrive = { path ->
+                                currentTab = 1
+                                if (path != null) {
+                                    viewModel.navigateTo(activeServerUri, effectiveToken, path, tokenManager = tokenManager)
+                                }
+                            },
+                            onNavigateToMusic = { currentTab = 2 },
+                            onNavigateToStorage = { currentTab = 3 },
+                            onNavigateToSettings = { currentTab = 4 },
+                            onNavigateToConnectionManager = onNavigateToConnectionManager,
+                            isServerOnline = isServerOnline,
+                            serverLatencyMs = serverLatencyMs,
+                            isTablet = true
+                        )
+                        1 -> DriveFilesView(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
@@ -234,14 +252,14 @@ fun AaxionDriveScreen(
                             isSidebarVisible = isSidebarVisible,
                             onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
                             onOpenSettings = {
-                                currentTab = 3
+                                currentTab = 4
                             },
                             isTablet = true,
                             isServerOnline = isServerOnline,
                             isLocalConnection = isLocalConnection,
                             onOpenConnectionManager = onNavigateToConnectionManager
                         )
-                        1 -> MusicView(
+                        2 -> MusicView(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
@@ -250,14 +268,14 @@ fun AaxionDriveScreen(
                             onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
                             isTablet = true
                         )
-                        2 -> StorageAndHubView(
+                        3 -> StorageAndHubView(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             masterToken = activeMasterToken,
                             lastRefreshTs = lastRefreshTs,
                             isRefreshing = isRefreshingToken,
                             onSelectStorageDevice = { targetPath ->
-                                currentTab = 0
+                                currentTab = 1
                                 if (!isDesktop) {
                                     isSidebarVisible = false
                                 }
@@ -273,7 +291,7 @@ fun AaxionDriveScreen(
                             onOpenIpSelector = onNavigateToConnectionManager,
                             onLogout = onLogout
                         )
-                        3 -> SettingsScreen(
+                        4 -> SettingsScreen(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             onBackClick = { currentTab = 0 },
@@ -315,15 +333,16 @@ fun AaxionDriveScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             val tabs = listOf(
-                                Triple("Drive", Icons.Default.CloudQueue, 0),
-                                Triple("Music", Icons.Default.Headphones, 1),
-                                Triple("Storage", Icons.Default.Storage, 2),
-                                Triple("Settings", Icons.Default.Settings, 3)
+                                Triple("Home", Icons.Default.Home, 0),
+                                Triple("Drive", Icons.Default.CloudQueue, 1),
+                                Triple("Music", Icons.Default.Headphones, 2),
+                                Triple("Storage", Icons.Default.Storage, 3),
+                                Triple("Settings", Icons.Default.Settings, 4)
                             )
 
                             tabs.forEach { (title, icon, index) ->
                                 val isSelected = currentTab == index
-                                val tabColor = if (index == 1) StreamerGreen else accentColor
+                                val tabColor = if (index == 2) StreamerGreen else accentColor
 
                                 val scale by animateFloatAsState(
                                     targetValue = if (isSelected) 1.05f else 1f,
@@ -393,7 +412,24 @@ fun AaxionDriveScreen(
                         .padding(paddingValues)
                 ) {
                     when (currentTab) {
-                        0 -> DriveFilesView(
+                        0 -> HomeScreen(
+                            serverUri = activeServerUri,
+                            token = effectiveToken,
+                            onNavigateToDrive = { path ->
+                                currentTab = 1
+                                if (path != null) {
+                                    viewModel.navigateTo(activeServerUri, effectiveToken, path, tokenManager = tokenManager)
+                                }
+                            },
+                            onNavigateToMusic = { currentTab = 2 },
+                            onNavigateToStorage = { currentTab = 3 },
+                            onNavigateToSettings = { currentTab = 4 },
+                            onNavigateToConnectionManager = onNavigateToConnectionManager,
+                            isServerOnline = isServerOnline,
+                            serverLatencyMs = serverLatencyMs,
+                            isTablet = false
+                        )
+                        1 -> DriveFilesView(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
@@ -402,14 +438,14 @@ fun AaxionDriveScreen(
                             isSidebarVisible = isSidebarVisible,
                             onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
                             onOpenSettings = {
-                                currentTab = 3
+                                currentTab = 4
                             },
                             isTablet = false,
                             isServerOnline = isServerOnline,
                             isLocalConnection = isLocalConnection,
                             onOpenConnectionManager = onNavigateToConnectionManager
                         )
-                        1 -> MusicView(
+                        2 -> MusicView(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             viewModel = viewModel,
@@ -418,14 +454,14 @@ fun AaxionDriveScreen(
                             onToggleSidebar = { isSidebarVisible = !isSidebarVisible },
                             isTablet = false
                         )
-                        2 -> StorageAndHubView(
+                        3 -> StorageAndHubView(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             masterToken = activeMasterToken,
                             lastRefreshTs = lastRefreshTs,
                             isRefreshing = isRefreshingToken,
                             onSelectStorageDevice = { targetPath ->
-                                currentTab = 0
+                                currentTab = 1
                                 if (!isDesktop) {
                                     isSidebarVisible = false
                                 }
@@ -441,7 +477,7 @@ fun AaxionDriveScreen(
                             onOpenIpSelector = onNavigateToConnectionManager,
                             onLogout = onLogout
                         )
-                        3 -> SettingsScreen(
+                        4 -> SettingsScreen(
                             serverUri = activeServerUri,
                             token = effectiveToken,
                             onBackClick = { currentTab = 0 },
@@ -474,7 +510,7 @@ fun AaxionDriveScreen(
                 onNavigateToConnectionManager()
             },
             onSelectStorageDevice = { targetPath ->
-                currentTab = 0
+                currentTab = 1
                 if (!isDesktop) {
                     isSidebarVisible = false
                 }

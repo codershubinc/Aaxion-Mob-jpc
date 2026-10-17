@@ -289,6 +289,16 @@ fun DriveFilesView(
                 VlcPlayerManager.getInstance(context).launchVlc(context, file, streamUrl, resume = false)
                 pendingResumeVideo = null
             },
+            onPlayInternal = {
+                MediaPlayerManager.getInstance(context).play(
+                    file = file,
+                    streamUrl = streamUrl,
+                    token = token,
+                    baseUrl = serverUri,
+                    siblingFiles = viewModel.files
+                )
+                pendingResumeVideo = null
+            },
             onDismiss = { pendingResumeVideo = null }
         )
     }

@@ -205,6 +205,21 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
                 )
             }
 
+            RecentPlaybackManager.getInstance(appContext).recordPlayback(
+                RecentMediaItem(
+                    id = file.rawPath,
+                    title = displayTitle ?: file.displayName(40),
+                    subtitle = displayArtist ?: if (isVideo) "Video" else "Audio",
+                    rawPath = file.rawPath,
+                    isVideo = isVideo,
+                    isAudio = !isVideo,
+                    artworkUrl = resolvedArt,
+                    durationMs = 0L,
+                    progressMs = 0L,
+                    size = file.size
+                )
+            )
+
             try {
                 val mp = MediaPlayer().apply {
                     setAudioAttributes(
@@ -240,6 +255,7 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
                                 durationMs = dur
                             )
                         }
+                        RecentPlaybackManager.getInstance(appContext).updateProgress(file.rawPath, 0L, dur)
                         player.isLooping = _state.value.isLooping
                         applyPlaybackSpeed(player, _state.value.playbackSpeed)
                         player.start()

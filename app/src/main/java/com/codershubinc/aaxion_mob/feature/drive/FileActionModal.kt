@@ -176,7 +176,7 @@ fun FileActionModal(
                         InsetGlassDivider(startIndent = 56.dp)
                         ModalActionItem(
                             icon = Icons.Default.PlayArrow,
-                            title = "Play in Floating Island",
+                            title = "Play in Internal Player",
                             subtitle = "Continuous in-app playback with capsule & player card",
                             accentColor = StreamerGreen,
                             onClick = {
@@ -238,6 +238,18 @@ fun FileActionModal(
                                 }
                             )
                         }
+
+                        InsetGlassDivider(startIndent = 56.dp)
+                        ModalActionItem(
+                            icon = Icons.Default.PlayArrow,
+                            title = "Play in Internal Player",
+                            subtitle = "Continuous in-app playback with floating island",
+                            accentColor = StreamerOrange,
+                            onClick = {
+                                onDismiss()
+                                MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token, baseUrl = baseUrl)
+                            }
+                        )
 
                         InsetGlassDivider(startIndent = 56.dp)
                         ModalActionItem(

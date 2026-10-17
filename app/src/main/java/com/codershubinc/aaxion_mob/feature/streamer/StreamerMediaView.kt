@@ -123,7 +123,13 @@ fun StreamerMediaView(
                         backgroundColor = AaxionCardBg,
                         borderColor = if (isVideo) StreamerOrange.copy(alpha = 0.3f) else StreamerGreen.copy(alpha = 0.3f),
                         onClick = {
-                            MediaPlayerManager.getInstance(context).play(media, streamUrl, token = token)
+                            MediaPlayerManager.getInstance(context).play(
+                                file = media,
+                                streamUrl = streamUrl,
+                                token = token,
+                                baseUrl = serverUri,
+                                siblingFiles = viewModel.files
+                            )
                         }
                     ) {
                         Column {

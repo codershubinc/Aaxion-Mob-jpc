@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.PowerManager
 import android.view.Surface
 import com.codershubinc.aaxion_mob.core.model.FileItem
+import com.codershubinc.aaxion_mob.core.network.buildImageViewUrl
+import com.codershubinc.aaxion_mob.core.network.buildThumbUrl
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,10 +21,12 @@ import kotlinx.coroutines.flow.update
 data class MediaPlaybackState(
     val currentFile: FileItem? = null,
     val streamUrl: String = "",
+    val artworkUrl: String? = null,
     val isVideo: Boolean = false,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
     val isLooping: Boolean = false,
+    val playbackSpeed: Float = 1.0f,
     val currentPositionMs: Long = 0L,
     val durationMs: Long = 0L,
     val videoWidth: Int = 0,
@@ -33,6 +37,71 @@ data class MediaPlaybackState(
 ) {
     val progressFraction: Float
         get() = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+}
+
+/**
+ * Resolves local folder artwork for a track by checking for same-named image files
+ * or standard cover art in the same directory.
+ */
+object ArtworkResolver {
+    fun findArtworkUrl(
+        trackFile: FileItem,
+        siblingFiles: List<FileItem>?,
+        baseUrl: String,
+        token: String
+    ): String? {
+        if (siblingFiles.isNullOrEmpty()) {
+            return if (trackFile.isVideo) trackFile.buildThumbUrl(baseUrl, token) else null
+        }
+
+        val trackBaseName = trackFile.nameWithoutExtension.trim()
+        if (trackBaseName.isEmpty()) return null
+
+        // 1. Exact match on track base name (e.g. "Song.jpg" for "Song.mp3")
+        val exactMatch = siblingFiles.firstOrNull { sibling ->
+            sibling.isImage && sibling.nameWithoutExtension.equals(trackBaseName, ignoreCase = true)
+        }
+        if (exactMatch != null) {
+            return exactMatch.buildImageViewUrl(baseUrl, token)
+        }
+
+        // 2. Exact match ignoring punctuation and special characters
+        val cleanTrack = trackBaseName.lowercase().filter { it.isLetterOrDigit() }
+        if (cleanTrack.isNotEmpty()) {
+            val normalizedMatch = siblingFiles.firstOrNull { sibling ->
+                sibling.isImage && sibling.nameWithoutExtension.lowercase().filter { it.isLetterOrDigit() } == cleanTrack
+            }
+            if (normalizedMatch != null) {
+                return normalizedMatch.buildImageViewUrl(baseUrl, token)
+            }
+        }
+
+        // 3. Common directory album art names (cover, folder, album, poster, artwork, front)
+        val directoryArtNames = setOf(
+            "cover", "folder", "album", "poster", "artwork", "front", "albumart",
+            "default", "backdrop", "fanart"
+        )
+        val directoryArt = siblingFiles.firstOrNull { sibling ->
+            sibling.isImage && sibling.nameWithoutExtension.lowercase() in directoryArtNames
+        }
+        if (directoryArt != null) {
+            return directoryArt.buildImageViewUrl(baseUrl, token)
+        }
+
+        // 4. Any image that starts with or contains the track name
+        val prefixMatch = siblingFiles.firstOrNull { sibling ->
+            sibling.isImage && (
+                sibling.nameWithoutExtension.startsWith(trackBaseName, ignoreCase = true) ||
+                trackBaseName.startsWith(sibling.nameWithoutExtension, ignoreCase = true)
+            )
+        }
+        if (prefixMatch != null) {
+            return prefixMatch.buildImageViewUrl(baseUrl, token)
+        }
+
+        // 5. Fallback for video thumbnails
+        return if (trackFile.isVideo) trackFile.buildThumbUrl(baseUrl, token) else null
+    }
 }
 
 /**
@@ -49,6 +118,16 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
     private val _state = MutableStateFlow(MediaPlaybackState())
     val state: StateFlow<MediaPlaybackState> = _state.asStateFlow()
 
+    private val sessionManager = AaxionMediaSessionManager(appContext)
+
+    init {
+        scope.launch {
+            _state.collect { state ->
+                sessionManager.update(state)
+            }
+        }
+    }
+
     companion object {
         @Volatile
         private var instance: MediaPlayerManager? = null
@@ -62,18 +141,34 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
 
     /**
      * Starts playback for a given FileItem and direct stream URL.
+     * Automatically scans siblingFiles in the same directory for matching album art / poster image.
      */
-    fun play(file: FileItem, streamUrl: String, isVideo: Boolean = file.isVideo, token: String? = null) {
+    fun play(
+        file: FileItem,
+        streamUrl: String,
+        isVideo: Boolean = file.isVideo,
+        token: String? = null,
+        baseUrl: String? = null,
+        siblingFiles: List<FileItem>? = null
+    ) {
         scope.launch {
             stopAndResetPlayer()
+
+            val effectiveBaseUrl = baseUrl ?: extractBaseUrl(streamUrl)
+            val effectiveToken = token ?: extractToken(streamUrl)
+            val resolvedArt = if (effectiveBaseUrl.isNotEmpty()) {
+                ArtworkResolver.findArtworkUrl(file, siblingFiles, effectiveBaseUrl, effectiveToken)
+            } else null
 
             _state.update {
                 it.copy(
                     currentFile = file,
                     streamUrl = streamUrl,
+                    artworkUrl = resolvedArt,
                     isVideo = isVideo,
                     isPlaying = false,
                     isBuffering = true,
+                    playbackSpeed = 1.0f,
                     currentPositionMs = 0L,
                     durationMs = 0L,
                     videoWidth = 0,
@@ -103,8 +198,8 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
                     }
 
                     val uri = Uri.parse(streamUrl)
-                    if (!token.isNullOrBlank()) {
-                        val headers = mapOf("Authorization" to "Bearer $token")
+                    if (!effectiveToken.isNullOrBlank()) {
+                        val headers = mapOf("Authorization" to "Bearer $effectiveToken")
                         setDataSource(appContext, uri, headers)
                     } else {
                         setDataSource(appContext, uri)
@@ -120,6 +215,7 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
                             )
                         }
                         player.isLooping = _state.value.isLooping
+                        applyPlaybackSpeed(player, _state.value.playbackSpeed)
                         player.start()
                         startProgressTracker()
                     }
@@ -220,6 +316,53 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
         _state.update { it.copy(isExpanded = !it.isExpanded) }
     }
 
+    /**
+     * If artwork was missing at start, dynamically resolves it from current folder files.
+     */
+    fun syncArtworkIfAvailable(siblingFiles: List<FileItem>, baseUrl: String, token: String) {
+        val current = _state.value.currentFile ?: return
+        if (_state.value.artworkUrl == null) {
+            val art = ArtworkResolver.findArtworkUrl(current, siblingFiles, baseUrl, token)
+            if (art != null) {
+                _state.update { it.copy(artworkUrl = art) }
+            }
+        }
+    }
+
+    /**
+     * Sets playback speed (0.75x, 1.0x, 1.25x, 1.5x, 2.0x).
+     */
+    fun setPlaybackSpeed(speed: Float) {
+        val mp = mediaPlayer ?: return
+        applyPlaybackSpeed(mp, speed)
+        _state.update { it.copy(playbackSpeed = speed) }
+    }
+
+    fun cyclePlaybackSpeed() {
+        val speeds = listOf(1.0f, 1.25f, 1.5f, 2.0f, 0.75f)
+        val current = _state.value.playbackSpeed
+        val nextIdx = (speeds.indexOf(current) + 1).let { if (it in speeds.indices) it else 0 }
+        setPlaybackSpeed(speeds[nextIdx])
+    }
+
+    private fun applyPlaybackSpeed(player: MediaPlayer, speed: Float) {
+        try {
+            val params = player.playbackParams
+            params.speed = speed
+            player.playbackParams = params
+        } catch (e: Exception) {
+            // ignore if unsupported on current audio device
+        }
+    }
+
+    private fun extractBaseUrl(url: String): String {
+        return if (url.contains("/api/")) url.substringBefore("/api/") else ""
+    }
+
+    private fun extractToken(url: String): String {
+        return if (url.contains("tkn=")) url.substringAfter("tkn=").substringBefore("&") else ""
+    }
+
     fun attachSurface(surface: Surface?) {
         if (currentSurface != null && currentSurface != surface) {
             try {
@@ -257,6 +400,7 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
         stopAndResetPlayer()
         detachSurface()
         _state.update { MediaPlaybackState() }
+        sessionManager.clear()
     }
 
     private fun startProgressTracker() {

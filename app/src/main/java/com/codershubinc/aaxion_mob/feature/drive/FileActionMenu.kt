@@ -69,7 +69,7 @@ fun FileActionMenu(
                 },
                 onClick = {
                     onDismissRequest()
-                    MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token)
+                    MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token, baseUrl = baseUrl)
                 }
             )
 

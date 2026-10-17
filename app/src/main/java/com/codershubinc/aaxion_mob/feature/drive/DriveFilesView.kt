@@ -72,6 +72,13 @@ fun DriveFilesView(
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
+    // Dynamically sync artwork when folder contents load or change
+    androidx.compose.runtime.LaunchedEffect(viewModel.files) {
+        if (viewModel.files.isNotEmpty()) {
+            MediaPlayerManager.getInstance(context).syncArtworkIfAvailable(viewModel.files, serverUri, token)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -166,7 +173,13 @@ fun DriveFilesView(
                                     viewModel.navigateTo(serverUri, token, file.rawPath, tokenManager = tokenManager)
                                 } else if (file.isVideo || file.isAudio) {
                                     val streamUrl = file.buildStreamUrl(serverUri, token)
-                                    MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token)
+                                    MediaPlayerManager.getInstance(context).play(
+                                        file = file,
+                                        streamUrl = streamUrl,
+                                        token = token,
+                                        baseUrl = serverUri,
+                                        siblingFiles = viewModel.files
+                                    )
                                 } else if (canOpenFileInViewer(file)) {
                                     activeViewingFile = file
                                 } else {
@@ -198,7 +211,13 @@ fun DriveFilesView(
                                     viewModel.navigateTo(serverUri, token, file.rawPath, tokenManager = tokenManager)
                                 } else if (file.isVideo || file.isAudio) {
                                     val streamUrl = file.buildStreamUrl(serverUri, token)
-                                    MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token)
+                                    MediaPlayerManager.getInstance(context).play(
+                                        file = file,
+                                        streamUrl = streamUrl,
+                                        token = token,
+                                        baseUrl = serverUri,
+                                        siblingFiles = viewModel.files
+                                    )
                                 } else if (canOpenFileInViewer(file)) {
                                     activeViewingFile = file
                                 } else {

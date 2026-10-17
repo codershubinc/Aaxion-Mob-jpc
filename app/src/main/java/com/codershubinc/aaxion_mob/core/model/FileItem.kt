@@ -12,6 +12,9 @@ data class FileItem(
     val extension: String
         get() = name.substringAfterLast('.', "").lowercase()
 
+    val nameWithoutExtension: String
+        get() = if (name.contains('.')) name.substringBeforeLast('.') else name
+
     val isVideo: Boolean
         get() = !isDir && isVideoFile(name)
 

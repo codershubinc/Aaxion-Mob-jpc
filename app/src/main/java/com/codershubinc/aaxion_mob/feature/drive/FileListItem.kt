@@ -153,7 +153,7 @@ fun FileListItem(
             // Quick Stream Action (Floating Island)
             if (isVideo || isAudio) {
                 IconButton(
-                    onClick = { MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token) },
+                    onClick = { MediaPlayerManager.getInstance(context).play(file, streamUrl, token = token, baseUrl = baseUrl) },
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(

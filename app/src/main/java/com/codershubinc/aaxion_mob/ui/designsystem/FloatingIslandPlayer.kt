@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -21,15 +22,23 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.codershubinc.aaxion_mob.core.media.MediaPlayerManager
 import com.codershubinc.aaxion_mob.core.media.MediaPlaybackState
 import com.codershubinc.aaxion_mob.core.util.IntentUtils
@@ -53,7 +62,7 @@ fun formatTimeMs(ms: Long): String {
 }
 
 /**
- * In-built Media Player that doubles as a Floating Island capsule / card.
+ * In-built Media Player that doubles as a Floating Island capsule / card docked at the bottom.
  * Plays audio & video continuously in the background while users explore files.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -70,21 +79,32 @@ fun FloatingIslandPlayer(
     val themeAccent = LocalAccentColor.current
     val mediaAccent = if (state.isVideo) StreamerOrange else StreamerGreen
 
+    val configuration = LocalConfiguration.current
+    val isMobile = configuration.screenWidthDp < 768
+
+    // Position above mobile bottom navigation dock when collapsed, or full bottom sheet when expanded
+    val bottomMargin = if (!state.isExpanded) {
+        if (isMobile) 86.dp else 16.dp
+    } else {
+        if (isMobile) 10.dp else 20.dp
+    }
+
     AnimatedVisibility(
         visible = state.isVisible,
-        enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(200)),
-        exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(150)),
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(tween(250)),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(tween(200)),
         modifier = modifier
-            .statusBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp)
+            .padding(bottom = bottomMargin)
     ) {
         Box(
             modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.TopCenter
+            contentAlignment = Alignment.BottomCenter
         ) {
             if (!state.isExpanded) {
                 // ==========================================
-                // COMPACT FLOATING ISLAND (Pill Capsule)
+                // COMPACT FLOATING ISLAND (Bottom Capsule)
                 // ==========================================
                 CompactIslandView(
                     state = state,
@@ -95,7 +115,7 @@ fun FloatingIslandPlayer(
                 )
             } else {
                 // ==========================================
-                // EXPANDED FLOATING ISLAND (Player Card)
+                // EXPANDED FLOATING ISLAND (Bottom Card)
                 // ==========================================
                 ExpandedIslandView(
                     state = state,
@@ -128,41 +148,152 @@ private fun CompactIslandView(
     onExpand: () -> Unit,
     onClose: () -> Unit
 ) {
-    val islandShape = RoundedCornerShape(26.dp)
+    val islandShape = RoundedCornerShape(27.dp)
     val fileName = state.currentFile?.name ?: "Media"
+    val fileExt = state.currentFile?.extension?.uppercase() ?: ""
 
     Box(
         modifier = Modifier
-            .widthIn(min = 220.dp, max = 380.dp)
-            .height(48.dp)
+            .widthIn(min = 260.dp, max = 460.dp)
+            .fillMaxWidth()
+            .height(56.dp)
+            .drawBehind {
+                // Frosted ambient radial backlight glow
+                val glowRadius = size.maxDimension * 0.75f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            accentColor.copy(alpha = 0.32f),
+                            accentColor.copy(alpha = 0.12f),
+                            Color.Transparent
+                        ),
+                        center = center,
+                        radius = glowRadius
+                    )
+                )
+            }
             .clip(islandShape)
-            .background(GlassBrushes.glassSurface(accent = accentColor, isHighlighted = true))
-            .border(1.dp, GlassBrushes.specularBorder(accentColor.copy(alpha = 0.5f)), islandShape)
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.45f),
+                        accentColor.copy(alpha = 0.40f),
+                        Color.White.copy(alpha = 0.12f)
+                    )
+                ),
+                shape = islandShape
+            )
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { _, dragAmount ->
+                    if (dragAmount < -12f) {
+                        onExpand()
+                    }
+                }
+            }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onExpand
             )
     ) {
+        // Frosted blur backdrop layers
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .blur(16.dp)
+                .background(accentColor.copy(alpha = 0.22f), islandShape)
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF1E2230).copy(alpha = 0.55f),
+                            Color(0xFF0F121A).copy(alpha = 0.65f)
+                        )
+                    ),
+                    islandShape
+                )
+        )
+
+        // Top specular reflection line
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth(0.92f)
+                .height(1.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.50f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Left: Animated equalizer bars / media icon
+            // Left: Album Art Thumbnail (if found) OR Animated Audio Equalizer
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(end = 8.dp)
             ) {
-                AnimatedAudioEqualizer(
-                    isPlaying = state.isPlaying,
-                    color = accentColor
-                )
+                if (state.artworkUrl != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .border(0.8.dp, accentColor.copy(alpha = 0.5f), RoundedCornerShape(9.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(state.artworkUrl)
+                                .crossfade(true)
+                                .size(96)
+                                .build(),
+                            contentDescription = "Artwork",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        if (state.isPlaying) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(2.dp)
+                                    .size(11.dp)
+                                    .clip(CircleShape)
+                                    .background(AaxionBg.copy(alpha = 0.9f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AnimatedAudioEqualizer(
+                                    isPlaying = true,
+                                    color = accentColor,
+                                    barWidth = 1.5.dp,
+                                    maxHeight = 7f
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    AnimatedAudioEqualizer(
+                        isPlaying = state.isPlaying,
+                        color = accentColor
+                    )
+                }
             }
 
-            // Center: Marquee filename & time status
+            // Center: Marquee filename & time status + format badge
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -192,6 +323,23 @@ private fun CompactIslandView(
                             color = TextSecondary,
                             fontSize = 10.sp
                         )
+                        if (fileExt.isNotEmpty()) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = fileExt,
+                                color = accentColor,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (state.playbackSpeed != 1.0f) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "${state.playbackSpeed}x",
+                                color = TextTertiary,
+                                fontSize = 9.sp
+                            )
+                        }
                         if (state.isBuffering) {
                             Spacer(modifier = Modifier.width(6.dp))
                             CircularProgressIndicator(
@@ -208,40 +356,40 @@ private fun CompactIslandView(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = onTogglePlay,
-                    modifier = Modifier.size(30.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (state.isPlaying) "Pause" else "Play",
                         tint = accentColor,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
                 IconButton(
                     onClick = onClose,
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close Player",
                         tint = TextTertiary,
-                        modifier = Modifier.size(15.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
         }
 
-        // Bottom progress highlight bar
+        // Top progress highlight bar (accent line along top edge of capsule)
         if (state.durationMs > 0L) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
+                    .align(Alignment.TopStart)
                     .fillMaxWidth(state.progressFraction)
                     .height(2.5.dp)
                     .background(
                         Brush.horizontalGradient(
-                            listOf(accentColor.copy(alpha = 0.6f), accentColor)
+                            listOf(accentColor.copy(alpha = 0.5f), accentColor)
                         )
                     )
             )
@@ -258,20 +406,105 @@ private fun ExpandedIslandView(
     onClose: () -> Unit,
     onOpenExternal: () -> Unit
 ) {
-    val cardShape = RoundedCornerShape(22.dp)
+    val cardShape = RoundedCornerShape(26.dp)
     val fileName = state.currentFile?.name ?: "Media"
     val isVideo = state.isVideo
 
-    Column(
+    Box(
         modifier = Modifier
-            .widthIn(max = 440.dp)
+            .widthIn(max = 460.dp)
             .fillMaxWidth()
+            .drawBehind {
+                // Frosted ambient radial backlight glow
+                val glowRadius = size.maxDimension * 0.70f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            accentColor.copy(alpha = 0.28f),
+                            accentColor.copy(alpha = 0.10f),
+                            Color.Transparent
+                        ),
+                        center = center,
+                        radius = glowRadius
+                    )
+                )
+            }
             .clip(cardShape)
-            .background(GlassBrushes.glassSurface(accent = accentColor, isHighlighted = true))
-            .border(1.2.dp, GlassBrushes.specularBorder(accentColor.copy(alpha = 0.6f)), cardShape)
-            .padding(14.dp)
+            .border(
+                width = 1.2.dp,
+                brush = Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.50f),
+                        accentColor.copy(alpha = 0.45f),
+                        Color.White.copy(alpha = 0.14f)
+                    )
+                ),
+                shape = cardShape
+            )
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { _, dragAmount ->
+                    if (dragAmount > 20f) {
+                        onCollapse()
+                    }
+                }
+            }
     ) {
-        // TOP HEADER: Type badge, External link, Collapse, Close
+        // Frosted blur backdrop layers
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .blur(20.dp)
+                .background(accentColor.copy(alpha = 0.20f), cardShape)
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF1A1D28).copy(alpha = 0.62f),
+                            Color(0xFF0D0F16).copy(alpha = 0.74f)
+                        )
+                    ),
+                    cardShape
+                )
+        )
+
+        // Top specular reflection line
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth(0.94f)
+                .height(1.2.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.55f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            // TOP DRAG HANDLE (Invites swiping down to collapse)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .width(36.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White.copy(alpha = 0.35f))
+            )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // HEADER: Type badge, Speed toggle chip, External link, Collapse, Close
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -292,8 +525,28 @@ private fun ExpandedIslandView(
                         letterSpacing = 0.5.sp
                     )
                 }
+
                 Spacer(modifier = Modifier.width(6.dp))
+
+                // Playback speed pill chip
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .border(0.6.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                        .clickable { manager.cyclePlaybackSpeed() }
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "${state.playbackSpeed}x",
+                        color = TextSecondary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
                 if (state.isBuffering) {
+                    Spacer(modifier = Modifier.width(6.dp))
                     CircularProgressIndicator(
                         color = accentColor,
                         strokeWidth = 1.5.dp,
@@ -322,7 +575,7 @@ private fun ExpandedIslandView(
                     modifier = Modifier.size(30.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.KeyboardArrowUp,
+                        imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = "Minimize to Island",
                         tint = TextSecondary,
                         modifier = Modifier.size(22.dp)
@@ -373,7 +626,7 @@ private fun ExpandedIslandView(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // VIEWPORT: Embedded Video or Audio Wave Art
+        // VIEWPORT: Embedded Video or High-Res Album Art / Audio Visualizer
         if (isVideo) {
             Box(
                 modifier = Modifier
@@ -384,6 +637,18 @@ private fun ExpandedIslandView(
                     .border(0.5.dp, GlassHairline, RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
+                if (state.artworkUrl != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(state.artworkUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
                 VideoTextureSurface(manager = manager)
 
                 if (state.isBuffering) {
@@ -394,28 +659,56 @@ private fun ExpandedIslandView(
                 }
             }
         } else {
-            // Audio Ambient Header Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(90.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(accentColor.copy(alpha = 0.08f))
-                    .border(0.5.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(14.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+            // Audio Viewport: High-Res Album Artwork Card or Wave Visualizer
+            if (state.artworkUrl != null) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(36.dp)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(170.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .border(1.2.dp, accentColor.copy(alpha = 0.45f), RoundedCornerShape(18.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(state.artworkUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Track Artwork",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
                     AnimatedAudioWaveVisualizer(isPlaying = state.isPlaying, color = accentColor)
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(96.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(accentColor.copy(alpha = 0.08f))
+                        .border(0.5.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        AnimatedAudioWaveVisualizer(isPlaying = state.isPlaying, color = accentColor)
+                    }
                 }
             }
         }
@@ -482,9 +775,9 @@ private fun ExpandedIslandView(
             )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // CONTROLS BAR: Loop, -10s, Play/Pause, +10s, Minimize
+        // CONTROLS BAR: Loop, -10s, Play/Pause, +10s, Speed
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -519,7 +812,7 @@ private fun ExpandedIslandView(
             // Play / Pause prominent circular button
             Box(
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(54.dp)
                     .clip(CircleShape)
                     .background(
                         Brush.radialGradient(
@@ -550,20 +843,28 @@ private fun ExpandedIslandView(
                 )
             }
 
-            // Minimize to pill
+            // Speed cycle button
             IconButton(
-                onClick = onCollapse,
+                onClick = { manager.cyclePlaybackSpeed() },
                 modifier = Modifier.size(38.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.CloseFullscreen,
-                    contentDescription = "Minimize",
-                    tint = TextTertiary,
-                    modifier = Modifier.size(19.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "${state.playbackSpeed}x",
+                        color = if (state.playbackSpeed != 1.0f) accentColor else TextTertiary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
+}
 }
 
 /**
@@ -602,13 +903,15 @@ private fun VideoTextureSurface(
 @Composable
 private fun AnimatedAudioEqualizer(
     isPlaying: Boolean,
-    color: Color
+    color: Color,
+    barWidth: Dp = 3.dp,
+    maxHeight: Float = 16f
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "equalizer_bars")
 
     val h1 by infiniteTransition.animateFloat(
-        initialValue = 4f,
-        targetValue = if (isPlaying) 16f else 6f,
+        initialValue = maxHeight * 0.25f,
+        targetValue = if (isPlaying) maxHeight else maxHeight * 0.35f,
         animationSpec = infiniteRepeatable(
             animation = tween(400, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
@@ -617,8 +920,8 @@ private fun AnimatedAudioEqualizer(
     )
 
     val h2 by infiniteTransition.animateFloat(
-        initialValue = 14f,
-        targetValue = if (isPlaying) 5f else 10f,
+        initialValue = maxHeight * 0.85f,
+        targetValue = if (isPlaying) maxHeight * 0.3f else maxHeight * 0.6f,
         animationSpec = infiniteRepeatable(
             animation = tween(320, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
@@ -627,8 +930,8 @@ private fun AnimatedAudioEqualizer(
     )
 
     val h3 by infiniteTransition.animateFloat(
-        initialValue = 7f,
-        targetValue = if (isPlaying) 18f else 5f,
+        initialValue = maxHeight * 0.45f,
+        targetValue = if (isPlaying) maxHeight * 1.1f else maxHeight * 0.3f,
         animationSpec = infiniteRepeatable(
             animation = tween(480, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
@@ -639,25 +942,25 @@ private fun AnimatedAudioEqualizer(
     Row(
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
-        modifier = Modifier.height(18.dp)
+        modifier = Modifier.height((maxHeight + 2).dp)
     ) {
         Box(
             modifier = Modifier
-                .width(3.dp)
+                .width(barWidth)
                 .height(h1.dp)
                 .clip(CircleShape)
                 .background(color)
         )
         Box(
             modifier = Modifier
-                .width(3.dp)
+                .width(barWidth)
                 .height(h2.dp)
                 .clip(CircleShape)
                 .background(color)
         )
         Box(
             modifier = Modifier
-                .width(3.dp)
+                .width(barWidth)
                 .height(h3.dp)
                 .clip(CircleShape)
                 .background(color)

@@ -60,6 +60,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import com.codershubinc.aaxion_mob.core.data.DataStoreManager
 import com.codershubinc.aaxion_mob.core.data.TokenManager
+import com.codershubinc.aaxion_mob.core.media.MediaPlayerManager
 import com.codershubinc.aaxion_mob.core.model.FileItem
 import com.codershubinc.aaxion_mob.core.model.StorageInfoResponse
 import com.codershubinc.aaxion_mob.core.network.Fetcher
@@ -111,9 +112,14 @@ fun AaxionDriveScreen(
     var isGridView by rememberSaveable { mutableStateOf(true) }
     var isSidebarVisible by remember(isDesktop) { mutableStateOf(isDesktop) }
 
-    // Intercept system Back button: Close sidebar drawer, return to Drive tab, or navigate back in dir tree
-    BackHandler(enabled = (isSidebarVisible && !isDesktop) || currentTab != 0 || (viewModel.currentPath != "/" && viewModel.currentPath.isNotEmpty())) {
-        if (isSidebarVisible && !isDesktop) {
+    val playerManager = remember { MediaPlayerManager.getInstance(context) }
+    val playerState by playerManager.state.collectAsState()
+
+    // Intercept system Back button: Close player if expanded, close sidebar drawer, return to Drive tab, or navigate back in dir tree
+    BackHandler(enabled = playerState.isExpanded || (isSidebarVisible && !isDesktop) || currentTab != 0 || (viewModel.currentPath != "/" && viewModel.currentPath.isNotEmpty())) {
+        if (playerState.isExpanded) {
+            playerManager.setExpanded(false)
+        } else if (isSidebarVisible && !isDesktop) {
             isSidebarVisible = false
         } else if (currentTab != 0) {
             currentTab = 0
@@ -460,9 +466,9 @@ fun AaxionDriveScreen(
             }
         )
 
-        // Built-in Floating Island Media Player (background streaming + capsule / card viewer)
+        // Built-in Floating Island Media Player (background streaming + capsule / card viewer docked at bottom)
         FloatingIslandPlayer(
-            modifier = Modifier.align(Alignment.TopCenter)
+            modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
 }

@@ -3,7 +3,8 @@ package com.codershubinc.aaxion_mob.feature.drive.viwerModals.code
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToastHost
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -157,11 +158,12 @@ fun CodeViewerModal(
         )
     ) {
         SyncDialogWindow()
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF09090D))
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF09090D))
+            ) {
             // Top Obsidian Navigation Surface
             Surface(
                 color = Color.Transparent,
@@ -306,7 +308,7 @@ fun CodeViewerModal(
                                 if (!codeContent.isNullOrEmpty()) {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                     clipboard.setPrimaryClip(ClipData.newPlainText("Source Code", codeContent))
-                                    Toast.makeText(context, "Code copied to clipboard", Toast.LENGTH_SHORT).show()
+                                    AaxionToast.show(context, "Code copied to clipboard")
                                 }
                             },
                             enabled = codeContent != null,
@@ -330,7 +332,7 @@ fun CodeViewerModal(
                             onClick = {
                                 val downloadUrl = file.buildDownloadUrl(serverUri, token)
                                 DownloadHelper.enqueueDownload(context, downloadUrl, file.name, token)
-                                Toast.makeText(context, "Download enqueued", Toast.LENGTH_SHORT).show()
+                                AaxionToast.show(context, "Download enqueued")
                             },
                             modifier = Modifier
                                 .size(34.dp)
@@ -561,6 +563,8 @@ fun CodeViewerModal(
                     }
                 }
             }
+            AaxionToastHost()
         }
     }
+}
 }

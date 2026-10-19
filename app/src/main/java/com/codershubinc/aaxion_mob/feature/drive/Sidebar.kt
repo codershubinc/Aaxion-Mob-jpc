@@ -269,6 +269,13 @@ fun SidebarContent(
             )
         }
 
+        // Upload Status Tile (Auto-resizes & expands on tap)
+        SidebarUploadTile(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 10.dp)
+        )
+
         // Bottom Block (Fixed): Divider + Settings
         Column(
             modifier = Modifier

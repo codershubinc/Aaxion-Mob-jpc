@@ -5,7 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -189,7 +189,7 @@ fun AaxionDriveScreen(
                     isServerOnline = true
                     isLocalConnection = false
                     serverLatencyMs = lat
-                    activeServerUri = tunnelUri!!
+                    activeServerUri = tunnelUri
                     found = true
                 }
             }
@@ -285,7 +285,7 @@ fun AaxionDriveScreen(
                                 scope.launch {
                                     val success = tokenManager.refreshAccessToken(activeServerUri)
                                     val msg = if (success) "Access token refreshed" else "Refresh failed"
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    AaxionToast.show(context, msg)
                                 }
                             },
                             onOpenIpSelector = onNavigateToConnectionManager,
@@ -471,7 +471,7 @@ fun AaxionDriveScreen(
                                 scope.launch {
                                     val success = tokenManager.refreshAccessToken(activeServerUri)
                                     val msg = if (success) "Access token refreshed" else "Refresh failed"
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    AaxionToast.show(context, msg)
                                 }
                             },
                             onOpenIpSelector = onNavigateToConnectionManager,
@@ -517,6 +517,15 @@ fun AaxionDriveScreen(
                 viewModel.navigateTo(activeServerUri, effectiveToken, targetPath, tokenManager = tokenManager)
             }
         )
+
+        // Mobile & collapsed floating upload status pill
+        if (isMobile || !isSidebarVisible) {
+            MobileUploadStatus(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = if (playerState.isVisible) 142.dp else if (isMobile) 82.dp else 16.dp)
+            )
+        }
 
         // Built-in Floating Island Media Player (background streaming + capsule / card viewer docked at bottom)
         FloatingIslandPlayer(

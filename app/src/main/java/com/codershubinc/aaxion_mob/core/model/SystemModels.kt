@@ -2,6 +2,15 @@ package com.codershubinc.aaxion_mob.core.model
 
 import com.google.gson.annotations.SerializedName
 
+data class PingResponse(
+    @SerializedName("status")
+    val status: String,
+    @SerializedName("message")
+    val message: String,
+    @SerializedName("timestamp")
+    val timestamp: Long
+)
+
 data class RootPathResponse(
     @SerializedName("root_path")
     val rootPath: String

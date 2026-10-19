@@ -6,7 +6,10 @@ import android.content.SharedPreferences
 import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
 import android.net.Uri
-import android.widget.Toast
+import android.util.Log
+import android.view.KeyEvent
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast
+import com.codershubinc.aaxion_mob.core.data.OmdbMetadataCacheDb
 import com.codershubinc.aaxion_mob.core.data.VideoMetadataCacheDb
 import com.codershubinc.aaxion_mob.core.data.VideoPlaybackMeta
 import com.codershubinc.aaxion_mob.core.model.FileItem
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 
 /**
  * Playback progress and resume metadata for a video file.
@@ -183,7 +187,9 @@ class VlcPlayerManager private constructor(private val context: Context) {
         file: FileItem,
         streamUrl: String,
         resume: Boolean = false,
-        token: String = ""
+        token: String = "",
+        customTitle: String? = null,
+        posterUrl: String? = null
     ) {
         val rawPath = file.rawPath
         val cached = cacheDb.get(rawPath)
@@ -198,12 +204,33 @@ class VlcPlayerManager private constructor(private val context: Context) {
             ?: RecentPlaybackManager.getInstance(context).recentItems.value.firstOrNull { it.rawPath == rawPath }?.durationMs?.takeIf { it > 0L }
             ?: 0L
 
+        // Resolve clean formatted title and artwork/poster URL
+        val omdbDb = OmdbMetadataCacheDb.getInstance(context)
+        val parsed = MediaTitleParser.parse(file.name)
+        val omdb = omdbDb.getForMedia(parsed, rawPath) ?: omdbDb.get(rawPath)
+
+        val displayTitle = customTitle
+            ?: parsed.getFormattedTitle(omdb?.title)
+            ?: omdb?.title
+            ?: file.displayName(40)
+        val artworkUrl = (posterUrl ?: omdb?.posterUrl)?.takeIf { it.isNotBlank() && it != "N/A" }
+
+        Log.d("VlcPlayerManager", "Resolved artworkUrl=$artworkUrl for title=$displayTitle")
+
+        // Ensure poster is cached to local disk for offline & notification usage
+        if (!artworkUrl.isNullOrBlank()) {
+            com.codershubinc.aaxion_mob.core.data.PosterCacheManager
+                .getInstance(context)
+                .cachePosterAsync(artworkUrl, scope)
+        }
+
         val initialMeta = cached?.copy(
             positionMs = startPositionMs,
-            durationMs = if (knownDuration > 0L) knownDuration else (cached.durationMs)
+            durationMs = if (knownDuration > 0L) knownDuration else (cached.durationMs),
+            title = displayTitle
         ) ?: VideoPlaybackMeta(
             rawPath = rawPath,
-            title = file.displayName(40),
+            title = displayTitle,
             streamUrl = streamUrl,
             durationMs = knownDuration,
             positionMs = startPositionMs,
@@ -224,16 +251,28 @@ class VlcPlayerManager private constructor(private val context: Context) {
             isVisible = true
         )
 
+
+        AaxionMediaSessionManager.getInstance(context).updateForMedia(
+            title = displayTitle,
+            subtitle = omdb?.year ?: "Playing in VLC",
+            album = omdb?.genre ?: "Aaxion Video",
+            positionMs = startPositionMs,
+            durationMs = initialMeta.durationMs,
+            artworkUrl = artworkUrl,
+            isPlaying = true,
+
+        )
         RecentPlaybackManager.getInstance(context).recordPlayback(
             RecentMediaItem(
                 id = rawPath,
-                title = file.displayName(40),
+                title = displayTitle,
                 subtitle = "Video",
                 rawPath = rawPath,
                 isVideo = true,
                 isAudio = false,
                 durationMs = initialMeta.durationMs,
                 progressMs = startPositionMs,
+                artworkUrl = artworkUrl,
                 size = file.size
             )
         )
@@ -252,13 +291,18 @@ class VlcPlayerManager private constructor(private val context: Context) {
         val vlcIntent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "video/*")
             setPackage("org.videolan.vlc")
-            putExtra("title", file.name)
-            putExtra("extra_title", file.name)
-            putExtra(Intent.EXTRA_TITLE, file.name)
+            putExtra("title", displayTitle)
+            putExtra("extra_title", displayTitle)
+            putExtra(Intent.EXTRA_TITLE, displayTitle)
             putExtra("from_start", !resume)
             if (startPositionMs > 0L) {
                 putExtra("position", startPositionMs)
                 putExtra("extra_position", startPositionMs)
+            }
+            if (artworkUrl?.isNotBlank()==true) {
+                putExtra("artworkURL", artworkUrl)
+                putExtra("poster", artworkUrl)
+                putExtra("extra_artwork", artworkUrl) 
             }
             putExtra("return_result", true)
             if (launcher == null) {
@@ -275,13 +319,18 @@ class VlcPlayerManager private constructor(private val context: Context) {
         } catch (e: Exception) {
             val genericIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "video/*")
-                putExtra("title", file.name)
-                putExtra("extra_title", file.name)
-                putExtra(Intent.EXTRA_TITLE, file.name)
+                putExtra("title", displayTitle)
+                putExtra("extra_title", displayTitle)
+                putExtra(Intent.EXTRA_TITLE, displayTitle)
                 putExtra("from_start", !resume)
                 if (startPositionMs > 0L) {
                     putExtra("position", startPositionMs)
                     putExtra("extra_position", startPositionMs)
+                }
+                if (!artworkUrl.isNullOrBlank()) {
+                    putExtra("artworkURL", artworkUrl)
+                    putExtra("poster", artworkUrl)
+                    putExtra("extra_artwork", artworkUrl)
                 }
                 if (launcher == null) {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -296,7 +345,7 @@ class VlcPlayerManager private constructor(private val context: Context) {
                     context.startActivity(chooser)
                 }
             } catch (err: Exception) {
-                Toast.makeText(context, "No video player available", Toast.LENGTH_SHORT).show()
+                AaxionToast.show(context, "No video player available")
             }
         }
     }
@@ -488,26 +537,189 @@ class VlcPlayerManager private constructor(private val context: Context) {
             )
         }
         activeSessionTracking = null
+        AaxionMediaSessionManager.getInstance(context).clear()
     }
 
     fun onActivityResumed() {
-        val session = activeSessionTracking ?: return
-        val elapsedMs = System.currentTimeMillis() - session.startTimestamp
-        val currentMeta = _activeVideoSession.value?.meta
-        val livePos = currentMeta?.positionMs ?: (session.startPositionMs + elapsedMs)
-        val safeDur = currentMeta?.durationMs ?: (getProgress(session.rawPath)?.durationMs ?: 0L)
+        val session = activeSessionTracking
+        if (session != null) {
+            val elapsedMs = System.currentTimeMillis() - session.startTimestamp
+            val currentMeta = _activeVideoSession.value?.meta
+            val livePos = currentMeta?.positionMs ?: (session.startPositionMs + elapsedMs)
+            val safeDur = currentMeta?.durationMs ?: (getProgress(session.rawPath)?.durationMs ?: 0L)
 
-        if (elapsedMs > 1500L) {
-            saveProgress(session.rawPath, livePos, safeDur)
+            if (elapsedMs > 1500L) {
+                saveProgress(session.rawPath, livePos, safeDur)
+            }
+            _activeVideoSession.value?.let { current ->
+                _activeVideoSession.value = current.copy(
+                    meta = current.meta.copy(positionMs = livePos, durationMs = safeDur),
+                    isPlayingInVlc = false
+                )
+            }
+        } else {
+            _activeVideoSession.value?.let { current ->
+                _activeVideoSession.value = current.copy(
+                    isPlayingInVlc = false
+                )
+            }
         }
         playbackTickerJob?.cancel()
-        _activeVideoSession.value?.let { current ->
-            _activeVideoSession.value = current.copy(
-                meta = current.meta.copy(positionMs = livePos, durationMs = safeDur),
-                isPlayingInVlc = false
+        activeSessionTracking = null
+        AaxionMediaSessionManager.getInstance(context).clear()
+    }
+
+    fun togglePlayPause() {
+        val current = _activeVideoSession.value ?: return
+        val isNowPlaying = !current.isPlayingInVlc
+        val currentPos = current.meta.positionMs
+
+        sendMediaButtonToVlc(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+
+        try {
+            val vlcIntent = Intent("org.videolan.vlc.remote.PlayPause").apply {
+                setPackage("org.videolan.vlc")
+            }
+            context.sendBroadcast(vlcIntent)
+        } catch (_: Exception) {}
+
+        _activeVideoSession.value = current.copy(isPlayingInVlc = isNowPlaying)
+
+        if (isNowPlaying) {
+            activeSessionTracking = ActiveVideoSession(
+                rawPath = current.rawPath,
+                startPositionMs = currentPos,
+                startTimestamp = System.currentTimeMillis()
+            )
+            startPlaybackTicker()
+        } else {
+            playbackTickerJob?.cancel()
+            activeSessionTracking = null
+            saveProgress(current.rawPath, currentPos, current.meta.durationMs)
+        }
+
+        val artworkUrl = RecentPlaybackManager.getInstance(context).recentItems.value
+            .firstOrNull { it.rawPath == current.rawPath }?.artworkUrl
+
+        AaxionMediaSessionManager.getInstance(context).updateForMedia(
+            title = current.meta.title,
+            subtitle = if (isNowPlaying) "Playing in VLC" else "Paused in VLC",
+            album = "Aaxion Video",
+            positionMs = currentPos,
+            durationMs = current.meta.durationMs,
+            artworkUrl = artworkUrl,
+            isPlaying = isNowPlaying
+        )
+    }
+
+    fun seekRelative(offsetMs: Long) {
+        val current = _activeVideoSession.value ?: return
+        val keyCode = if (offsetMs >= 0) KeyEvent.KEYCODE_MEDIA_FAST_FORWARD else KeyEvent.KEYCODE_MEDIA_REWIND
+        sendMediaButtonToVlc(keyCode)
+
+        val vlcAction = if (offsetMs >= 0) "org.videolan.vlc.remote.Forward" else "org.videolan.vlc.remote.Backward"
+        try {
+            val vlcIntent = Intent(vlcAction).apply {
+                setPackage("org.videolan.vlc")
+            }
+            context.sendBroadcast(vlcIntent)
+        } catch (_: Exception) {}
+
+        val newPos = (current.meta.positionMs + offsetMs).coerceAtLeast(0L)
+        val clampedPos = if (current.meta.durationMs > 0L) newPos.coerceAtMost(current.meta.durationMs) else newPos
+        val updatedMeta = current.meta.copy(positionMs = clampedPos)
+        _activeVideoSession.value = current.copy(meta = updatedMeta)
+
+        if (current.isPlayingInVlc) {
+            activeSessionTracking = ActiveVideoSession(
+                rawPath = current.rawPath,
+                startPositionMs = clampedPos,
+                startTimestamp = System.currentTimeMillis()
             )
         }
+        saveProgress(current.rawPath, clampedPos, current.meta.durationMs)
+
+        val artworkUrl = RecentPlaybackManager.getInstance(context).recentItems.value
+            .firstOrNull { it.rawPath == current.rawPath }?.artworkUrl
+
+        AaxionMediaSessionManager.getInstance(context).updateForMedia(
+            title = current.meta.title,
+            subtitle = if (current.isPlayingInVlc) "Playing in VLC" else "Paused in VLC",
+            album = "Aaxion Video",
+            positionMs = clampedPos,
+            durationMs = current.meta.durationMs,
+            artworkUrl = artworkUrl,
+            isPlaying = current.isPlayingInVlc
+        )
+    }
+
+    fun stopSession() {
+        playbackTickerJob?.cancel()
+        sendMediaButtonToVlc(KeyEvent.KEYCODE_MEDIA_STOP)
+        try {
+            val vlcIntent = Intent("org.videolan.vlc.remote.Stop").apply {
+                setPackage("org.videolan.vlc")
+            }
+            context.sendBroadcast(vlcIntent)
+        } catch (_: Exception) {}
+
+        val current = _activeVideoSession.value
+        if (current != null) {
+            saveProgress(current.rawPath, current.meta.positionMs, current.meta.durationMs)
+            _activeVideoSession.value = current.copy(isPlayingInVlc = false)
+        }
         activeSessionTracking = null
+        AaxionMediaSessionManager.getInstance(context).clear()
+    }
+
+    fun play() {
+        val current = _activeVideoSession.value ?: return
+        if (!current.isPlayingInVlc) {
+            togglePlayPause()
+        }
+    }
+
+    fun pause() {
+        val current = _activeVideoSession.value ?: return
+        if (current.isPlayingInVlc) {
+            togglePlayPause()
+        }
+    }
+
+    private fun sendMediaButtonToVlc(keyCode: Int) {
+        try {
+            val downEvent = KeyEvent(KeyEvent.ACTION_DOWN, keyCode)
+            val upEvent = KeyEvent(KeyEvent.ACTION_UP, keyCode)
+
+            val baseIntent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
+                setPackage("org.videolan.vlc")
+            }
+            val receivers = context.packageManager.queryBroadcastReceivers(baseIntent, 0)
+            val component = if (receivers.isNotEmpty()) {
+                android.content.ComponentName(
+                    receivers[0].activityInfo.packageName,
+                    receivers[0].activityInfo.name
+                )
+            } else null
+
+            val downIntent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
+                setPackage("org.videolan.vlc")
+                if (component != null) {
+                    this.component = component
+                }
+                putExtra(Intent.EXTRA_KEY_EVENT, downEvent)
+            }
+            context.sendOrderedBroadcast(downIntent, null)
+
+            val upIntent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
+                setPackage("org.videolan.vlc")
+                if (component != null) {
+                    this.component = component
+                }
+                putExtra(Intent.EXTRA_KEY_EVENT, upEvent)
+            }
+            context.sendOrderedBroadcast(upIntent, null)
+        } catch (_: Exception) {}
     }
 
     companion object {

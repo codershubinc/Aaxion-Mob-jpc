@@ -9,6 +9,7 @@ import android.view.Surface
 import com.codershubinc.aaxion_mob.core.model.FileItem
 import com.codershubinc.aaxion_mob.core.model.MusicTrack
 import com.codershubinc.aaxion_mob.core.network.AaxionUrlBuilder
+import com.codershubinc.aaxion_mob.core.network.ApiEndpoints
 import com.codershubinc.aaxion_mob.core.network.buildImageViewUrl
 import com.codershubinc.aaxion_mob.core.network.buildStreamUrl
 import com.codershubinc.aaxion_mob.core.network.buildThumbUrl
@@ -135,7 +136,7 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
     private val _state = MutableStateFlow(MediaPlaybackState())
     val state: StateFlow<MediaPlaybackState> = _state.asStateFlow()
 
-    private val sessionManager = AaxionMediaSessionManager(appContext)
+    private val sessionManager = AaxionMediaSessionManager.getInstance(appContext)
 
     init {
         scope.launch {
@@ -178,9 +179,28 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
 
             val effectiveBaseUrl = baseUrl ?: extractBaseUrl(streamUrl)
             val effectiveToken = token ?: extractToken(streamUrl)
-            val resolvedArt = artworkUrlOverride ?: if (effectiveBaseUrl.isNotEmpty()) {
-                ArtworkResolver.findArtworkUrl(file, siblingFiles, effectiveBaseUrl, effectiveToken)
-            } else null
+
+            val omdb = com.codershubinc.aaxion_mob.core.data.OmdbMetadataCacheDb.getInstance(appContext).get(file.rawPath)
+            val parsed = com.codershubinc.aaxion_mob.core.media.MediaTitleParser.parse(file.name)
+            val cleanTitle = displayTitle
+                ?: parsed.getFormattedTitle(omdb?.title)
+                ?: omdb?.title
+                ?: file.displayName(40)
+            val resolvedArt = artworkUrlOverride
+                ?: omdb?.posterUrl
+                ?: if (effectiveBaseUrl.isNotEmpty()) {
+                    ArtworkResolver.findArtworkUrl(file, siblingFiles, effectiveBaseUrl, effectiveToken)
+                } else null
+            val cleanArtist = displayArtist
+                ?: when {
+                    parsed.seasonBadgeLong != null -> "${parsed.seasonBadgeLong} • Aaxion Player"
+                    omdb?.year?.isNotBlank() == true -> "${omdb.year} • Aaxion Player"
+                    isVideo -> "Video • Aaxion Player"
+                    else -> "Audio • Aaxion Player"
+                }
+            val cleanAlbum = displayAlbum
+                ?: omdb?.genre?.takeIf { it.isNotBlank() && it != "N/A" }
+                ?: (if (isVideo) "Movies & Series" else "Aaxion Library")
 
             _state.update {
                 it.copy(
@@ -198,9 +218,9 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
                     isExpanded = isVideo,
                     isVisible = true,
                     errorMessage = null,
-                    displayTitle = displayTitle,
-                    displayArtist = displayArtist,
-                    displayAlbum = displayAlbum,
+                    displayTitle = cleanTitle,
+                    displayArtist = cleanArtist,
+                    displayAlbum = cleanAlbum,
                     musicTrackId = musicTrackId
                 )
             }
@@ -324,6 +344,28 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
         } catch (e: Exception) {
             // Player might be in an invalid state
         }
+    }
+
+    fun play() {
+        val mp = mediaPlayer ?: return
+        try {
+            if (!mp.isPlaying) {
+                mp.start()
+                _state.update { it.copy(isPlaying = true) }
+                startProgressTracker()
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun pause() {
+        val mp = mediaPlayer ?: return
+        try {
+            if (mp.isPlaying) {
+                mp.pause()
+                _state.update { it.copy(isPlaying = false) }
+                stopProgressTracker()
+            }
+        } catch (_: Exception) {}
     }
 
     fun seekTo(positionMs: Long) {
@@ -640,7 +682,7 @@ class MediaPlayerManager private constructor(private val appContext: Context) {
     }
 
     private fun extractBaseUrl(url: String): String {
-        return if (url.contains("/api/")) url.substringBefore("/api/") else ""
+        return if (url.contains(ApiEndpoints.API_PREFIX)) url.substringBefore(ApiEndpoints.API_PREFIX) else ""
     }
 
     private fun extractToken(url: String): String {

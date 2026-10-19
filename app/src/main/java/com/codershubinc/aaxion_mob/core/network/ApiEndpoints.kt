@@ -1,6 +1,14 @@
 package com.codershubinc.aaxion_mob.core.network
 
+/**
+ * Centralized API route definitions and endpoint constants for the Aaxion Server.
+ */
 object ApiEndpoints {
+
+    const val API_PREFIX = "/api/"
+    const val API_V1_PREFIX = "/api/v1"
+    const val PING = "/api/v1/ping"
+
     // ==========================================
     // Authentication
     // ==========================================
@@ -22,10 +30,15 @@ object ApiEndpoints {
         const val UPLOAD = "/api/v1/files/upload"
         const val DOWNLOAD = "/api/v1/files/download"
         const val STREAM = "/api/v1/files/stream"
+        const val DELETE = "/api/v1/files/delete"
+        const val RENAME = "/api/v1/files/rename"
+        const val MOVE = "/api/v1/files/move"
+        const val COPY = "/api/v1/files/copy"
+        const val SEARCH = "/api/v1/files/search"
         const val THUMBNAIL = "/api/v1/images/thumbnail"
         const val VIEW_IMAGE = "/api/v1/images/view"
         const val SHARE_REQUEST = "/api/v1/share/temp/request"
-        const val SHARE_DOWNLOAD = "/api/v1/share/temp" // /api/v1/share/temp/{token}
+        const val SHARE_DOWNLOAD = "/api/v1/share/temp"
     }
 
     // ==========================================
@@ -41,7 +54,7 @@ object ApiEndpoints {
     // Temporary File Sharing
     // ==========================================
     object SHARE {
-        const val TEMP = "/api/v1/share/temp" // /api/v1/share/temp/{token}
+        const val TEMP = "/api/v1/share/temp"
         const val REQUEST = "/api/v1/share/temp/request"
     }
 
@@ -70,9 +83,10 @@ object ApiEndpoints {
     }
 
     // ==========================================
-    // System Information
+    // System Information & Health
     // ==========================================
     object SYSTEM {
+        const val PING = "/api/v1/ping"
         const val INFO = "/api/v1/system/info"
         const val GET_ROOT_PATH = "/api/v1/system/root-path"
         const val STORAGE = "/api/v1/system/storage"
@@ -89,6 +103,20 @@ object ApiEndpoints {
         const val UPDATE = "/api/v1/music/update"
         const val STREAM = "/api/v1/music/stream"
     }
+
+    /**
+     * Resolves a fully-qualified URL for baseUrl and endpoint.
+     */
+    fun url(baseUrl: String, endpoint: String): String {
+        val cleanBase = baseUrl.trimEnd('/')
+        val cleanEndpoint = if (endpoint.startsWith("/")) endpoint else "/$endpoint"
+        return "$cleanBase$cleanEndpoint"
+    }
+
+    /**
+     * Returns the ping endpoint URL for the given baseUrl.
+     */
+    fun pingUrl(baseUrl: String): String = url(baseUrl, PING)
 }
 
 typealias API_ENDPOINTS = ApiEndpoints

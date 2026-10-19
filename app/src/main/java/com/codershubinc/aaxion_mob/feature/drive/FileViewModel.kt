@@ -1,5 +1,6 @@
 package com.codershubinc.aaxion_mob.feature.drive
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -7,8 +8,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codershubinc.aaxion_mob.core.data.TokenManager
+import com.codershubinc.aaxion_mob.core.media.DirectoryMediaType
+import com.codershubinc.aaxion_mob.core.media.MediaDirectoryManager
 import com.codershubinc.aaxion_mob.core.model.FileItem
 import com.codershubinc.aaxion_mob.core.network.Fetcher
+import com.codershubinc.aaxion_mob.core.network.OmdbClient
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -37,6 +41,9 @@ class FileViewModel : ViewModel() {
 
     private val _sortAscending = MutableStateFlow(true)
     val sortAscendingFlow: StateFlow<Boolean> = _sortAscending.asStateFlow()
+
+    private val _currentDirectoryMediaType = MutableStateFlow(DirectoryMediaType.NONE)
+    val currentDirectoryMediaType: StateFlow<DirectoryMediaType> = _currentDirectoryMediaType.asStateFlow()
 
     var files: List<FileItem>
         get() = _files.value
@@ -79,7 +86,8 @@ class FileViewModel : ViewModel() {
         baseUrl: String,
         token: String,
         path: String = "/",
-        tokenManager: TokenManager? = null
+        tokenManager: TokenManager? = null,
+        context: Context? = null
     ) {
         if (baseUrl.isNotBlank()) lastBaseUrl = baseUrl
         if (token.isNotBlank()) lastToken = token
@@ -103,6 +111,9 @@ class FileViewModel : ViewModel() {
                 if (response.isSuccessful) {
                     files = response.body() ?: emptyList()
                     currentPath = path
+                    if (context != null) {
+                        updateCurrentDirectoryType(context)
+                    }
                 } else {
                     errorMessage = "Error ${response.code()}: ${response.message()}"
                 }
@@ -111,6 +122,74 @@ class FileViewModel : ViewModel() {
             } finally {
                 isLoading = false
             }
+        }
+    }
+
+    fun updateCurrentDirectoryType(context: Context) {
+        val resolved = MediaDirectoryManager.getInstance(context).resolveDirectoryType(currentPath)
+        _currentDirectoryMediaType.value = resolved
+        if (resolved != DirectoryMediaType.NONE && files.isNotEmpty()) {
+            triggerOmdbSync(context)
+        }
+    }
+
+    fun setDirectoryMediaType(context: Context, path: String, type: DirectoryMediaType) {
+        MediaDirectoryManager.getInstance(context).setDirectoryType(path, type)
+        _currentDirectoryMediaType.value = MediaDirectoryManager.getInstance(context).resolveDirectoryType(currentPath)
+        if (_currentDirectoryMediaType.value != DirectoryMediaType.NONE) {
+            triggerOmdbSync(context)
+        }
+    }
+
+    fun markCurrentDirectoryAs(context: Context, type: DirectoryMediaType) {
+        setDirectoryMediaType(context, currentPath, type)
+    }
+
+    fun triggerOmdbSync(context: Context) {
+        val dirType = _currentDirectoryMediaType.value
+        if (dirType != DirectoryMediaType.NONE && files.isNotEmpty()) {
+            viewModelScope.launch {
+                OmdbClient.syncDirectory(context, files, dirType)
+            }
+        }
+    }
+
+    suspend fun createDirectory(
+        baseUrl: String,
+        token: String,
+        folderName: String,
+        tokenManager: TokenManager? = null,
+        context: Context? = null
+    ): Boolean {
+        val cleanName = folderName.trim().trim('/')
+        if (cleanName.isBlank()) return false
+        val targetPath = if (currentPath.endsWith("/")) "$currentPath$cleanName" else "$currentPath/$cleanName"
+
+        val effectiveBase = baseUrl.ifBlank { lastBaseUrl }
+        var effectiveTok = token.ifBlank { lastToken }
+        if (tokenManager != null) {
+            val activeAccess = tokenManager.accessTokenState.value
+            if (!activeAccess.isNullOrBlank()) effectiveTok = activeAccess
+        }
+
+        return try {
+            val service = Fetcher.getInstance().getService(effectiveBase)
+            var response = service.createDirectory(targetPath, "Bearer $effectiveTok")
+            if (response.code() == 401 && tokenManager != null) {
+                val refreshed = tokenManager.refreshAccessToken(effectiveBase)
+                if (refreshed) {
+                    val newTok = tokenManager.accessTokenState.value ?: effectiveTok
+                    response = service.createDirectory(targetPath, "Bearer $newTok")
+                }
+            }
+            if (response.isSuccessful || response.code() == 201 || response.code() == 200) {
+                fetchFiles(effectiveBase, effectiveTok, currentPath, tokenManager, context)
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
         }
     }
 

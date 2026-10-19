@@ -1,4 +1,4 @@
-package com.codershubinc.aaxion_mob.feature.home
+package com.codershubinc.aaxion_mob.feature.home.components
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -34,12 +34,13 @@ import com.codershubinc.aaxion_mob.ui.theme.*
 import java.util.Locale
 
 @Composable
-internal fun StorageHeroCard(
+fun StorageHeroCard(
     storageInfo: StorageInfoResponse?,
     isLoading: Boolean,
     accentColor: Color,
     onOpenStorageHub: () -> Unit,
-    onSelectMountPoint: (String) -> Unit
+    onSelectMountPoint: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val usagePct = storageInfo?.usagePercentage ?: 0.0
     val rawProgress = (usagePct / 100.0).toFloat().coerceIn(0f, 1f)
@@ -56,7 +57,7 @@ internal fun StorageHeroCard(
     }
 
     GlassCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         cornerRadius = 22.dp,
         accentHighlight = healthTint,
         isHighlighted = true,
@@ -176,16 +177,17 @@ internal fun StorageHeroCard(
 }
 
 @Composable
-internal fun VolumeQuickPill(
+fun VolumeQuickPill(
     label: String,
     usedPct: String,
     icon: ImageVector,
     tint: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(50))
             .background(Color.White.copy(alpha = 0.05f))
             .border(0.6.dp, tint.copy(alpha = 0.35f), RoundedCornerShape(50))

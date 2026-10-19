@@ -2,6 +2,7 @@ package com.codershubinc.aaxion_mob
 
 import com.codershubinc.aaxion_mob.core.model.AddTrackResponse
 import com.codershubinc.aaxion_mob.core.model.MusicTrack
+import com.codershubinc.aaxion_mob.core.model.PingResponse
 import com.codershubinc.aaxion_mob.core.network.AaxionUrlBuilder
 import com.codershubinc.aaxion_mob.core.network.ApiEndpoints
 import com.codershubinc.aaxion_mob.core.network.buildArtworkUrl
@@ -131,5 +132,30 @@ class MusicIntegrationTest {
         assertEquals(1, response.tracks.size)
         assertEquals("Never Gonna Give You Up", response.tracks[0].title)
         assertEquals(1987, response.tracks[0].releaseYear)
+    }
+
+    @Test
+    fun testPingResponseDeserialization() {
+        val json = """
+            {
+              "status": "ok",
+              "message": "pong",
+              "timestamp": 1729237148
+            }
+        """.trimIndent()
+
+        val response = Gson().fromJson(json, PingResponse::class.java)
+        assertEquals("ok", response.status)
+        assertEquals("pong", response.message)
+        assertEquals(1729237148L, response.timestamp)
+    }
+
+    @Test
+    fun testPingApiEndpointsAndUrlHelpers() {
+        assertEquals("/api/v1/ping", ApiEndpoints.PING)
+        assertEquals("/api/v1/ping", ApiEndpoints.SYSTEM.PING)
+        assertEquals("http://192.168.1.50:8080/api/v1/ping", ApiEndpoints.pingUrl(baseUrl))
+        assertEquals("http://192.168.1.50:8080/api/v1/ping", ApiEndpoints.pingUrl("$baseUrl/"))
+        assertEquals("http://192.168.1.50:8080/api/v1/files/stream", ApiEndpoints.url(baseUrl, ApiEndpoints.FILES.STREAM))
     }
 }

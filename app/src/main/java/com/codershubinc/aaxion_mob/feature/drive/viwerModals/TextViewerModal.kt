@@ -3,7 +3,8 @@ package com.codershubinc.aaxion_mob.feature.drive.viwerModals
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToastHost
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -122,11 +123,12 @@ fun TextViewerModal(
         )
     ) {
         SyncDialogWindow()
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF09090D))
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF09090D))
+            ) {
             // Obsidian Glass Top Navigation Bar
             Surface(
                 color = Color.Transparent,
@@ -266,7 +268,7 @@ fun TextViewerModal(
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                     val clip = ClipData.newPlainText("File Content", text)
                                     clipboard.setPrimaryClip(clip)
-                                    Toast.makeText(context, "Copied content to clipboard", Toast.LENGTH_SHORT).show()
+                                    AaxionToast.show(context, "Copied content to clipboard")
                                 }
                             },
                             enabled = textContent != null,
@@ -448,6 +450,8 @@ fun TextViewerModal(
                     }
                 }
             }
+            AaxionToastHost()
         }
     }
+}
 }

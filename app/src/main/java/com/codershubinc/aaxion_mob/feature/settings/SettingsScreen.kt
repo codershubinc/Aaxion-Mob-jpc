@@ -1,6 +1,6 @@
 package com.codershubinc.aaxion_mob.feature.settings
 
-import android.widget.Toast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Storage
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +31,9 @@ import androidx.compose.ui.unit.sp
 import coil.Coil
 import com.codershubinc.aaxion_mob.core.data.TokenManager
 import com.codershubinc.aaxion_mob.core.data.DataStoreManager
+import com.codershubinc.aaxion_mob.core.data.OmdbMetadataCacheDb
+import com.codershubinc.aaxion_mob.core.media.MediaDirectoryManager
+import com.codershubinc.aaxion_mob.core.network.OmdbClient
 import com.codershubinc.aaxion_mob.core.model.AccentTheme
 import com.codershubinc.aaxion_mob.core.model.IconPackTheme
 import com.codershubinc.aaxion_mob.core.util.IntentUtils
@@ -82,6 +85,13 @@ fun SettingsScreen(
     val activeAccessToken by tokenManager.accessTokenState.collectAsState()
 
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
+
+    val omdbDb = remember { OmdbMetadataCacheDb.getInstance(context) }
+    val cachedOmdbItems by omdbDb.cachedItems.collectAsState()
+    val mediaDirManager = remember { MediaDirectoryManager.getInstance(context) }
+    val designatedDirs by mediaDirManager.directoryTypes.collectAsState()
+    var currentOmdbKey by remember { mutableStateOf(OmdbClient.getApiKey(context)) }
+    var showApiKeyDialog by remember { mutableStateOf(false) }
 
     val content = @Composable {
         Scaffold(
@@ -227,7 +237,7 @@ fun SettingsScreen(
                                 scope.launch {
                                     val success = tokenManager.refreshAccessToken(serverUri)
                                     val msg = if (success) "Access token refreshed (valid 4 hours)" else "Token refresh failed"
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    AaxionToast.show(context, msg)
                                 }
                             },
                             isLoading = isRefreshingToken,
@@ -294,7 +304,7 @@ fun SettingsScreen(
                                     .clickable {
                                         scope.launch {
                                             dataStoreManager.setAccentTheme(accent.id)
-                                            Toast.makeText(context, "Accent set to ${accent.title}", Toast.LENGTH_SHORT).show()
+                                            AaxionToast.show(context, "Accent set to ${accent.title}")
                                         }
                                     }
                                     .padding(4.dp)
@@ -346,7 +356,7 @@ fun SettingsScreen(
                                 .clickable {
                                     scope.launch {
                                         dataStoreManager.setIconPack(pack.id)
-                                        Toast.makeText(context, "Icon pack set to ${pack.title}", Toast.LENGTH_SHORT).show()
+                                        AaxionToast.show(context, "Icon pack set to ${pack.title}")
                                     }
                                 }
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -551,13 +561,95 @@ fun SettingsScreen(
                                     }
                                     withContext(Dispatchers.Main) {
                                         cacheSizeString = "0 B"
-                                        Toast.makeText(context, "Memory and disk cache cleared", Toast.LENGTH_SHORT).show()
+                                        AaxionToast.show(context, "Memory and disk cache cleared")
                                     }
                                 }
                             }
                         ) {
                             Text("CLEAR", color = StreamerOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
+                    }
+                }
+
+                // SECTION: Media & OMDB Metadata
+                SettingsSectionHeader("MEDIA & OMDB METADATA")
+                InsetGroupedGlassCard {
+                    // Row 1: OMDB API Key
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showApiKeyDialog = true }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            SettingsRow(
+                                icon = Icons.Default.VpnKey,
+                                iconTint = StreamerOrange,
+                                title = "OMDB API Key",
+                                subtitle = if (currentOmdbKey == OmdbClient.DEFAULT_OMDB_KEY) {
+                                    "Default Community Key ($currentOmdbKey)"
+                                } else {
+                                    "Custom Key (••••${currentOmdbKey.takeLast(4)})"
+                                }
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit OMDB Key",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    InsetGlassDivider(startIndent = 56.dp)
+
+                    // Row 2: OMDB Metadata Cache
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SettingsRow(
+                            icon = Icons.Default.Movie,
+                            iconTint = StreamerOrange,
+                            title = "OMDB Posters & Info Cache",
+                            subtitle = "${cachedOmdbItems.size} titles cached in SQLite"
+                        )
+                        if (cachedOmdbItems.isNotEmpty()) {
+                            TextButton(
+                                onClick = {
+                                    scope.launch(Dispatchers.IO) {
+                                        omdbDb.clear()
+                                        withContext(Dispatchers.Main) {
+                                            AaxionToast.show(context, "OMDB cache cleared")
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text("CLEAR", color = StreamerOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    InsetGlassDivider(startIndent = 56.dp)
+
+                    // Row 3: Designated Directories
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SettingsRow(
+                            icon = Icons.Default.FolderSpecial,
+                            iconTint = StreamerPurple,
+                            title = "Designated Media Directories",
+                            subtitle = if (designatedDirs.isEmpty()) "No directories designated" else "${designatedDirs.size} active designations"
+                        )
                     }
                 }
 
@@ -605,6 +697,74 @@ fun SettingsScreen(
         }
     } else {
         content()
+    }
+
+    if (showApiKeyDialog) {
+        var keyInput by remember { mutableStateOf(currentOmdbKey) }
+
+        GlassDialog(
+            onDismissRequest = { showApiKeyDialog = false },
+            accentHighlight = accentColor
+        ) {
+            Text("OMDB API Key", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                "Used to automatically fetch high-res posters, IMDb ratings, and movie synopsis. You can get a free personal key at omdbapi.com/apikey.aspx",
+                color = TextTertiary,
+                fontSize = 12.sp,
+                lineHeight = 16.sp
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            OutlinedTextField(
+                value = keyInput,
+                onValueChange = { keyInput = it },
+                label = { Text("API Key") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = accentColor,
+                    unfocusedBorderColor = AaxionBorder,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    focusedLabelColor = accentColor,
+                    unfocusedLabelColor = TextTertiary
+                )
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = {
+                        keyInput = OmdbClient.DEFAULT_OMDB_KEY
+                        OmdbClient.setApiKey(context, keyInput)
+                        currentOmdbKey = keyInput
+                        showApiKeyDialog = false
+                        AaxionToast.show(context, "Reset to default OMDB key")
+                    }
+                ) {
+                    Text("USE DEFAULT", color = TextSecondary, fontSize = 12.sp)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                GlassButton(
+                    text = "Save",
+                    onClick = {
+                        val trimmed = keyInput.trim()
+                        if (trimmed.isNotBlank()) {
+                            OmdbClient.setApiKey(context, trimmed)
+                            currentOmdbKey = trimmed
+                            showApiKeyDialog = false
+                            AaxionToast.show(context, "OMDB API Key updated")
+                        } else {
+                            AaxionToast.show(context, "Key cannot be empty")
+                        }
+                    },
+                    accentColor = accentColor
+                )
+            }
+        }
     }
 }
 

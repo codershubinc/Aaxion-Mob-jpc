@@ -1,6 +1,6 @@
 package com.codershubinc.aaxion_mob.feature.drive
 
-import android.widget.Toast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -279,7 +279,7 @@ fun InteractiveBreadcrumbs(
                         if (hasValidExtension && !targetPath.endsWith("/")) {
                             targetPath = if (lastSlashIdx != -1) targetPath.substring(0, lastSlashIdx) else "/"
                             if (targetPath.isEmpty()) targetPath = "/"
-                            Toast.makeText(context, "File path detected. Navigating to parent directory...", Toast.LENGTH_SHORT).show()
+                            AaxionToast.show(context, "File path detected. Navigating to parent directory...")
                         }
                         
                         if (targetPath.isNotBlank()) {

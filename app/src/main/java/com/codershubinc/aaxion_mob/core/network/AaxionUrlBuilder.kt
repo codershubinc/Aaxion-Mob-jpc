@@ -19,50 +19,50 @@ object AaxionUrlBuilder {
         }
 
     fun buildStreamUrl(baseUrl: String, rawPath: String, token: String): String {
-        val clean = cleanBaseUrl(baseUrl)
+        val base = ApiEndpoints.url(baseUrl, ApiEndpoints.FILES.STREAM)
         val encoded = encodePath(rawPath)
-        return "$clean/api/v1/files/stream?path=$encoded&tkn=$token"
+        return "$base?path=$encoded&tkn=$token"
     }
 
     fun buildDownloadUrl(baseUrl: String, rawPath: String, token: String): String {
-        val clean = cleanBaseUrl(baseUrl)
+        val base = ApiEndpoints.url(baseUrl, ApiEndpoints.FILES.DOWNLOAD)
         val encoded = encodePath(rawPath)
-        return "$clean/api/v1/files/download?path=$encoded&tkn=$token"
+        return "$base?path=$encoded&tkn=$token"
     }
 
     fun buildThumbUrl(baseUrl: String, rawPath: String, token: String = ""): String {
-        val clean = cleanBaseUrl(baseUrl)
+        val base = ApiEndpoints.url(baseUrl, ApiEndpoints.IMAGES.THUMB)
         val encoded = encodePath(rawPath)
         return if (token.isNotEmpty()) {
-            "$clean/api/v1/images/thumb?path=$encoded&tkn=$token"
+            "$base?path=$encoded&tkn=$token"
         } else {
-            "$clean/api/v1/images/thumb?path=$encoded"
+            "$base?path=$encoded"
         }
     }
 
     fun buildImageViewUrl(baseUrl: String, rawPath: String, token: String = ""): String {
-        val clean = cleanBaseUrl(baseUrl)
+        val base = ApiEndpoints.url(baseUrl, ApiEndpoints.IMAGES.VIEW)
         val encoded = encodePath(rawPath)
         return if (token.isNotEmpty()) {
-            "$clean/api/v1/images/view?path=$encoded&tkn=$token"
+            "$base?path=$encoded&tkn=$token"
         } else {
-            "$clean/api/v1/images/view?path=$encoded"
+            "$base?path=$encoded"
         }
     }
 
     fun buildMusicStreamUrl(baseUrl: String, trackId: Long, token: String): String {
-        val clean = cleanBaseUrl(baseUrl)
-        return "$clean/api/v1/music/stream?id=$trackId&tkn=$token"
+        val base = ApiEndpoints.url(baseUrl, ApiEndpoints.MUSIC.STREAM)
+        return "$base?id=$trackId&tkn=$token"
     }
 
     fun buildMusicArtworkUrl(baseUrl: String, imagePath: String, token: String = ""): String {
         if (imagePath.isBlank()) return ""
-        val clean = cleanBaseUrl(baseUrl)
+        val base = ApiEndpoints.url(baseUrl, ApiEndpoints.IMAGES.VIEW)
         val encoded = encodePath(imagePath)
         return if (token.isNotEmpty()) {
-            "$clean/api/v1/images/view?path=$encoded&tkn=$token"
+            "$base?path=$encoded&tkn=$token"
         } else {
-            "$clean/api/v1/images/view?path=$encoded"
+            "$base?path=$encoded"
         }
     }
 }

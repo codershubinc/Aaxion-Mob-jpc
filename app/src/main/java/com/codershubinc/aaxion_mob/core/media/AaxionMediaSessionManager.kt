@@ -22,9 +22,9 @@ import kotlinx.coroutines.*
 
 /**
  * Manages system-level MediaSession and native Media Notification with transport controls,
- * lockscreen integration, and lockscreen/notification album artwork.
+ * lockscreen integration, and lockscreen/notification album artwork for all video and audio playback.
  */
-class AaxionMediaSessionManager(private val appContext: Context) {
+class AaxionMediaSessionManager private constructor(private val appContext: Context) {
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val notificationManager =
@@ -34,51 +34,110 @@ class AaxionMediaSessionManager(private val appContext: Context) {
     private var currentArtworkBitmap: Bitmap? = null
     private var artworkJob: Job? = null
 
+    private var lastTitle: String = ""
+    private var lastSubtitle: String = ""
+    private var lastAlbum: String = ""
+    private var lastDuration: Long = 0L
+
     val mediaSession: MediaSession = MediaSession(appContext, "AaxionMediaSession").apply {
         setCallback(object : MediaSession.Callback() {
             override fun onPlay() {
-                MediaPlayerManager.getInstance(appContext).togglePlayPause()
+                val vlc = VlcPlayerManager.getInstance(appContext)
+                val vlcSession = vlc.activeSession.value
+                if (vlcSession != null && vlcSession.isVisible) {
+                    vlc.play()
+                } else {
+                    MediaPlayerManager.getInstance(appContext).play()
+                }
             }
 
             override fun onPause() {
-                MediaPlayerManager.getInstance(appContext).togglePlayPause()
+                val vlc = VlcPlayerManager.getInstance(appContext)
+                val vlcSession = vlc.activeSession.value
+                if (vlcSession != null && vlcSession.isVisible) {
+                    vlc.pause()
+                } else {
+                    MediaPlayerManager.getInstance(appContext).pause()
+                }
             }
 
             override fun onSkipToNext() {
-                val mgr = MediaPlayerManager.getInstance(appContext)
-                if (mgr.hasNextTrack()) {
-                    mgr.playNext()
+                val vlc = VlcPlayerManager.getInstance(appContext)
+                val vlcSession = vlc.activeSession.value
+                if (vlcSession != null && vlcSession.isVisible) {
+                    vlc.seekRelative(10000L)
                 } else {
-                    mgr.seekRelative(10000L)
+                    val mgr = MediaPlayerManager.getInstance(appContext)
+                    if (mgr.hasNextTrack()) {
+                        mgr.playNext()
+                    } else {
+                        seekRelative(10000L)
+                    }
                 }
             }
 
             override fun onSkipToPrevious() {
-                val mgr = MediaPlayerManager.getInstance(appContext)
-                if (mgr.hasPreviousTrack()) {
-                    mgr.playPrevious()
+                val vlc = VlcPlayerManager.getInstance(appContext)
+                val vlcSession = vlc.activeSession.value
+                if (vlcSession != null && vlcSession.isVisible) {
+                    vlc.seekRelative(-10000L)
                 } else {
-                    mgr.seekRelative(-10000L)
+                    val mgr = MediaPlayerManager.getInstance(appContext)
+                    if (mgr.hasPreviousTrack()) {
+                        mgr.playPrevious()
+                    } else {
+                        seekRelative(-10000L)
+                    }
                 }
             }
 
             override fun onSeekTo(pos: Long) {
-                MediaPlayerManager.getInstance(appContext).seekTo(pos)
+                val vlc = VlcPlayerManager.getInstance(appContext)
+                val vlcSession = vlc.activeSession.value
+                if (vlcSession != null && vlcSession.isVisible) {
+                    val diff = pos - vlcSession.meta.positionMs
+                    vlc.seekRelative(diff)
+                } else {
+                    MediaPlayerManager.getInstance(appContext).seekTo(pos)
+                }
             }
 
             override fun onFastForward() {
-                MediaPlayerManager.getInstance(appContext).seekRelative(10000L)
+                val vlc = VlcPlayerManager.getInstance(appContext)
+                val vlcSession = vlc.activeSession.value
+                if (vlcSession != null && vlcSession.isVisible) {
+                    vlc.seekRelative(10000L)
+                } else {
+                    seekRelative(10000L)
+                }
             }
 
             override fun onRewind() {
-                MediaPlayerManager.getInstance(appContext).seekRelative(-10000L)
+                val vlc = VlcPlayerManager.getInstance(appContext)
+                val vlcSession = vlc.activeSession.value
+                if (vlcSession != null && vlcSession.isVisible) {
+                    vlc.seekRelative(-10000L)
+                } else {
+                    seekRelative(-10000L)
+                }
             }
 
             override fun onStop() {
-                MediaPlayerManager.getInstance(appContext).close()
+                val vlc = VlcPlayerManager.getInstance(appContext)
+                val vlcSession = vlc.activeSession.value
+                if (vlcSession != null && vlcSession.isVisible) {
+                    vlc.stopSession()
+                } else {
+                    MediaPlayerManager.getInstance(appContext).close()
+                    clear()
+                }
             }
         })
         isActive = false
+    }
+
+    private fun seekRelative(offsetMs: Long) {
+        MediaPlayerManager.getInstance(appContext).seekRelative(offsetMs)
     }
 
     init {
@@ -106,9 +165,40 @@ class AaxionMediaSessionManager(private val appContext: Context) {
             return
         }
 
+        val fileName = state.displayTitle ?: state.currentFile?.name ?: "Media"
+        val subtitle = state.displayArtist ?: if (state.isVideo) "Aaxion Video" else "Aaxion Audio"
+        val album = state.displayAlbum ?: "Aaxion Library"
+
+        updateForMedia(
+            title = fileName,
+            subtitle = subtitle,
+            album = album,
+            positionMs = state.currentPositionMs,
+            durationMs = state.durationMs,
+            artworkUrl = state.artworkUrl,
+            isPlaying = state.isPlaying,
+            speed = state.playbackSpeed
+        )
+    }
+
+    fun updateForMedia(
+        title: String,
+        subtitle: String,
+        album: String,
+        positionMs: Long,
+        durationMs: Long,
+        artworkUrl: String?,
+        isPlaying: Boolean,
+        speed: Float = 1.0f
+    ) {
         if (!mediaSession.isActive) {
             mediaSession.isActive = true
         }
+
+        lastTitle = title
+        lastSubtitle = subtitle
+        lastAlbum = album
+        lastDuration = durationMs
 
         // 1. Update PlaybackState for lockscreen & bluetooth controllers
         val actions = PlaybackState.ACTION_PLAY or
@@ -122,57 +212,67 @@ class AaxionMediaSessionManager(private val appContext: Context) {
         val pState = PlaybackState.Builder()
             .setActions(actions)
             .setState(
-                if (state.isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
-                state.currentPositionMs,
-                state.playbackSpeed
+                if (isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
+                positionMs,
+                speed
             )
             .build()
         mediaSession.setPlaybackState(pState)
 
-        // 2. Artwork loading
-        if (state.artworkUrl != currentArtworkUrl) {
-            currentArtworkUrl = state.artworkUrl
+        // 2. Artwork loading with disk-cached poster support
+        if (artworkUrl != currentArtworkUrl) {
+            currentArtworkUrl = artworkUrl
             artworkJob?.cancel()
             currentArtworkBitmap = null
 
-            if (!state.artworkUrl.isNullOrBlank()) {
-                artworkJob = scope.launch(Dispatchers.IO) {
-                    try {
-                        val request = ImageRequest.Builder(appContext)
-                            .data(state.artworkUrl)
-                            .allowHardware(false) // Non-hardware bitmap needed for notifications & metadata
-                            .size(512, 512)
-                            .build()
-                        val result = Coil.imageLoader(appContext).execute(request)
-                        if (result is SuccessResult) {
-                            val bmp = (result.drawable as? BitmapDrawable)?.bitmap
-                            withContext(Dispatchers.Main) {
-                                currentArtworkBitmap = bmp
-                                pushMetadata(state, bmp)
-                                postNotification(state, bmp)
+            if (!artworkUrl.isNullOrBlank()) {
+                val cachedBmp = com.codershubinc.aaxion_mob.core.data.PosterCacheManager.getInstance(appContext)
+                    .loadCachedBitmap(artworkUrl)
+                if (cachedBmp != null) {
+                    currentArtworkBitmap = cachedBmp
+                } else {
+                    artworkJob = scope.launch(Dispatchers.IO) {
+                        try {
+                            val request = ImageRequest.Builder(appContext)
+                                .data(artworkUrl)
+                                .allowHardware(false) // Non-hardware bitmap needed for notifications & metadata
+                                .size(512, 512)
+                                .build()
+                            val result = Coil.imageLoader(appContext).execute(request)
+                            if (result is SuccessResult) {
+                                val bmp = (result.drawable as? BitmapDrawable)?.bitmap
+                                withContext(Dispatchers.Main) {
+                                    currentArtworkBitmap = bmp
+                                    pushMetadata(title, subtitle, album, durationMs, bmp)
+                                    postNotification(title, subtitle, isPlaying, bmp)
+                                }
+                                com.codershubinc.aaxion_mob.core.data.PosterCacheManager.getInstance(appContext)
+                                    .cachePoster(artworkUrl)
                             }
+                        } catch (e: Exception) {
+                            // ignore artwork loading errors
                         }
-                    } catch (e: Exception) {
-                        // ignore artwork loading errors
                     }
                 }
             }
         }
 
-        pushMetadata(state, currentArtworkBitmap)
-        postNotification(state, currentArtworkBitmap)
+        pushMetadata(title, subtitle, album, durationMs, currentArtworkBitmap)
+        postNotification(title, subtitle, isPlaying, currentArtworkBitmap)
     }
 
-    private fun pushMetadata(state: MediaPlaybackState, artworkBitmap: Bitmap?) {
-        val fileName = state.displayTitle ?: state.currentFile?.name ?: "Media"
-        val subtitle = state.displayArtist ?: if (state.isVideo) "Aaxion Video" else "Aaxion Audio"
-        val album = state.displayAlbum ?: "Aaxion Library"
-
+    private fun pushMetadata(
+        title: String,
+        subtitle: String,
+        album: String,
+        durationMs: Long,
+        artworkBitmap: Bitmap?
+    ) {
         val metaBuilder = MediaMetadata.Builder()
-            .putString(MediaMetadata.METADATA_KEY_TITLE, fileName)
+            .putString(MediaMetadata.METADATA_KEY_TITLE, title)
             .putString(MediaMetadata.METADATA_KEY_ARTIST, subtitle)
             .putString(MediaMetadata.METADATA_KEY_ALBUM, album)
-            .putLong(MediaMetadata.METADATA_KEY_DURATION, state.durationMs)
+            .putLong(MediaMetadata.METADATA_KEY_DURATION, durationMs)
 
         if (artworkBitmap != null) {
             metaBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, artworkBitmap)
@@ -186,10 +286,12 @@ class AaxionMediaSessionManager(private val appContext: Context) {
         }
     }
 
-    private fun postNotification(state: MediaPlaybackState, artworkBitmap: Bitmap?) {
-        val fileName = state.displayTitle ?: state.currentFile?.name ?: "Media"
-        val subtitle = state.displayArtist ?: if (state.isVideo) "Aaxion Video" else "Aaxion Audio"
-
+    private fun postNotification(
+        title: String,
+        subtitle: String,
+        isPlaying: Boolean,
+        artworkBitmap: Bitmap?
+    ) {
         val openIntent = Intent(appContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -241,12 +343,12 @@ class AaxionMediaSessionManager(private val appContext: Context) {
 
         notifBuilder
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(fileName)
+            .setContentTitle(title)
             .setContentText(subtitle)
             .setContentIntent(openPending)
             .setDeleteIntent(stopPending)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .setOngoing(state.isPlaying)
+            .setOngoing(isPlaying)
             .addAction(
                 Notification.Action.Builder(
                     Icon.createWithResource(appContext, android.R.drawable.ic_media_rew),
@@ -258,9 +360,9 @@ class AaxionMediaSessionManager(private val appContext: Context) {
                 Notification.Action.Builder(
                     Icon.createWithResource(
                         appContext,
-                        if (state.isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+                        if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
                     ),
-                    if (state.isPlaying) "Pause" else "Play",
+                    if (isPlaying) "Pause" else "Play",
                     playPausePending
                 ).build()
             )
@@ -333,5 +435,14 @@ class AaxionMediaSessionManager(private val appContext: Context) {
         const val ACTION_REWIND = "com.codershubinc.aaxion_mob.ACTION_REWIND"
         const val ACTION_FORWARD = "com.codershubinc.aaxion_mob.ACTION_FORWARD"
         const val ACTION_STOP = "com.codershubinc.aaxion_mob.ACTION_STOP"
+
+        @Volatile
+        private var instance: AaxionMediaSessionManager? = null
+
+        fun getInstance(context: Context): AaxionMediaSessionManager {
+            return instance ?: synchronized(this) {
+                instance ?: AaxionMediaSessionManager(context.applicationContext).also { instance = it }
+            }
+        }
     }
 }

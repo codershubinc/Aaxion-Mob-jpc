@@ -80,6 +80,10 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val notificationPermissionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { /* result handled */ }
+
     @Suppress("DEPRECATION")
     private fun android.content.Intent.getFlexibleLong(key: String, default: Long = -1L): Long {
         val bundle = extras ?: return default
@@ -88,6 +92,42 @@ class MainActivity : ComponentActivity() {
             is Number -> value.toLong()
             is String -> value.toLongOrNull() ?: default
             else -> default
+        }
+    }
+
+    private val sharedUrisState = mutableStateOf<List<android.net.Uri>?>(null)
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShareIntent(intent)
+    }
+
+    private fun handleShareIntent(intent: android.content.Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        val type = intent.type ?: return
+
+        if (android.content.Intent.ACTION_SEND == action) {
+            val streamUri = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<android.net.Uri>(android.content.Intent.EXTRA_STREAM)
+            } ?: intent.data
+            if (streamUri != null) {
+                sharedUrisState.value = listOf(streamUri)
+            }
+        } else if (android.content.Intent.ACTION_SEND_MULTIPLE == action) {
+            val streamUris = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableArrayListExtra<android.net.Uri>(android.content.Intent.EXTRA_STREAM)
+            }
+            if (!streamUris.isNullOrEmpty()) {
+                sharedUrisState.value = streamUris
+            }
         }
     }
 
@@ -102,6 +142,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         applySystemBars()
+        handleShareIntent(intent)
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
         com.codershubinc.aaxion_mob.core.media.VlcPlayerManager.getInstance(applicationContext).setLauncher(vlcVideoResultLauncher)
 
         lifecycleScope.launch {
@@ -123,7 +171,13 @@ class MainActivity : ComponentActivity() {
             .addInterceptor { chain ->
                 val request = chain.request()
                 val token = TokenManager.getInstance(applicationContext).accessTokenState.value
-                val newRequest = if (!token.isNullOrBlank()) {
+                val host = request.url.host.lowercase()
+                val isExternalHost = host.contains("media-amazon.com") ||
+                    host.contains("imdb.com") ||
+                    host.contains("omdbapi.com") ||
+                    host.contains("jsdelivr.net") ||
+                    host.contains("cloudfront.net")
+                val newRequest = if (!token.isNullOrBlank() && !isExternalHost) {
                     request.newBuilder()
                         .header("Authorization", "Bearer $token")
                         .build()
@@ -171,7 +225,14 @@ class MainActivity : ComponentActivity() {
                 accentTheme = activeAccent,
                 iconPackTheme = activeIconPack
             ) {
-                AppNavigation()
+                Box(modifier = Modifier.fillMaxSize()) {
+                    val sharedUris by sharedUrisState
+                    AppNavigation(
+                        sharedUris = sharedUris,
+                        onClearSharedUris = { sharedUrisState.value = null }
+                    )
+                    com.codershubinc.aaxion_mob.ui.designsystem.AaxionToastHost()
+                }
             }
         }
     }
@@ -217,7 +278,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    sharedUris: List<android.net.Uri>? = null,
+    onClearSharedUris: () -> Unit = {}
+) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -446,6 +510,18 @@ fun AppNavigation() {
                     discoveredServerUris.clear()
                     refreshDiscovery.value += 1
                 }
+            )
+        }
+    }
+
+    sharedUris?.let { uris ->
+        if (uris.isNotEmpty() && isLoggedIn) {
+            com.codershubinc.aaxion_mob.feature.drive.ShareUploadDialog(
+                sharedUris = uris,
+                serverUri = activeServerUri,
+                token = activeAccessToken ?: "",
+                initialTargetDir = fileViewModel.currentPath,
+                onDismiss = onClearSharedUris
             )
         }
     }

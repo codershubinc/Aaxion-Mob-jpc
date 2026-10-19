@@ -1,6 +1,7 @@
 package com.codershubinc.aaxion_mob.feature.drive.viwerModals
 
-import android.widget.Toast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToastHost
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -285,7 +286,7 @@ fun ImageViewerModal(
                                 onClick = {
                                     val downloadUrl = file.buildDownloadUrl(serverUri, token)
                                     DownloadHelper.enqueueDownload(context, downloadUrl, file.name, token)
-                                    Toast.makeText(context, "Downloading ${file.name}", Toast.LENGTH_SHORT).show()
+                                    AaxionToast.show(context, "Downloading ${file.name}")
                                 },
                                 modifier = Modifier
                                     .size(36.dp)
@@ -334,6 +335,7 @@ fun ImageViewerModal(
                     )
                 }
             }
+            AaxionToastHost()
         }
     }
 }

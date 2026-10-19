@@ -3,7 +3,7 @@ package com.codershubinc.aaxion_mob.feature.drive.viwerModals
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -330,7 +330,7 @@ fun MarkdownDocumentView(
                                 onClick = {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                     clipboard.setPrimaryClip(ClipData.newPlainText("Code", block.code))
-                                    Toast.makeText(context, "Code copied", Toast.LENGTH_SHORT).show()
+                                    AaxionToast.show(context, "Code copied")
                                 },
                                 modifier = Modifier.size(24.dp)
                             ) {

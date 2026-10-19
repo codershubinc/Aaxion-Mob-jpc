@@ -150,6 +150,46 @@ class RecentPlaybackManager private constructor(context: Context) {
         _recentItems.value = emptyList()
     }
 
+    /**
+     * Refreshes all recent items against SQLite caches (VideoMetadataCacheDb and OmdbMetadataCacheDb)
+     * to keep progress, duration, and poster artwork completely updated.
+     */
+    fun refreshFromCache(context: Context) {
+        val videoDb = com.codershubinc.aaxion_mob.core.data.VideoMetadataCacheDb.getInstance(context)
+        val omdbDb = com.codershubinc.aaxion_mob.core.data.OmdbMetadataCacheDb.getInstance(context)
+        val current = _recentItems.value.toMutableList()
+        var changed = false
+        for (i in current.indices) {
+            val item = current[i]
+            var updated = item
+            if (item.isVideo) {
+                val cached = videoDb.get(item.rawPath)
+                if (cached != null) {
+                    val newPos = if (cached.positionMs > 0L) cached.positionMs else item.progressMs
+                    val newDur = if (cached.durationMs > 0L) cached.durationMs else item.durationMs
+                    if (newPos != item.progressMs || newDur != item.durationMs) {
+                        updated = updated.copy(progressMs = newPos, durationMs = newDur)
+                        changed = true
+                    }
+                }
+                if (updated.artworkUrl.isNullOrBlank()) {
+                    val info = com.codershubinc.aaxion_mob.core.media.MediaTitleParser.parse(item.title)
+                    val omdb = omdbDb.getForMedia(info, item.rawPath)
+                    if (omdb != null && omdb.posterUrl.isNotBlank()) {
+                        updated = updated.copy(artworkUrl = omdb.posterUrl)
+                        changed = true
+                    }
+                }
+            }
+            if (updated != item) {
+                current[i] = updated
+            }
+        }
+        if (changed) {
+            persistItems(current)
+        }
+    }
+
     companion object {
         @Volatile
         private var instance: RecentPlaybackManager? = null

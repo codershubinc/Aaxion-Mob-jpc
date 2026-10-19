@@ -1,7 +1,9 @@
 package com.codershubinc.aaxion_mob.core.network
 
 
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -29,9 +31,7 @@ class Fetcher private constructor() {
     fun getClient(): OkHttpClient {
         return okHttpClient ?: synchronized(this) {
             okHttpClient ?: run {
-                val logging = HttpLoggingInterceptor().apply {
-                    level = HttpLoggingInterceptor.Level.BODY
-                }
+                val logging = SelectiveHttpLoggingInterceptor()
                 OkHttpClient.Builder()
                     .connectTimeout(15, TimeUnit.SECONDS)
                     .readTimeout(30, TimeUnit.SECONDS)
@@ -62,5 +62,41 @@ class Fetcher private constructor() {
             }
         }
         return apiService!!
+    }
+}
+
+/**
+ * Selective HTTP logging interceptor that logs full bodies for JSON API requests/responses,
+ * but omits file binary bodies for uploads, chunk streaming, and file downloads.
+ */
+class SelectiveHttpLoggingInterceptor : Interceptor {
+    private val bodyLogger = HttpLoggingInterceptor().apply {
+        level = HttpLoggingInterceptor.Level.BODY
+    }
+    private val headersLogger = HttpLoggingInterceptor().apply {
+        level = HttpLoggingInterceptor.Level.HEADERS
+    }
+
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val path = request.url.encodedPath.lowercase()
+        val contentType = request.body?.contentType()?.toString()?.lowercase() ?: ""
+
+        val isFileUpload = path.contains("/upload") ||
+                path.contains("/chunk") ||
+                contentType.contains("multipart") ||
+                contentType.contains("octet-stream")
+
+        val isBinaryDownload = path.contains("/download") ||
+                path.contains("/stream") ||
+                path.contains("/thumb") ||
+                path.contains("/images/")
+
+        val logger = if (isFileUpload || isBinaryDownload) {
+            headersLogger
+        } else {
+            bodyLogger
+        }
+        return logger.intercept(chain)
     }
 }

@@ -1,12 +1,15 @@
-package com.codershubinc.aaxion_mob.feature.home
+package com.codershubinc.aaxion_mob.feature.home.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +29,79 @@ import com.codershubinc.aaxion_mob.ui.designsystem.GlassCard
 import com.codershubinc.aaxion_mob.ui.theme.*
 
 @Composable
-internal fun BentoWorkspaceTile(
+fun BentoWorkspaceGrid(
+    accentColor: Color,
+    displayHost: String,
+    isServerOnline: Boolean?,
+    onNavigateToDrive: (path: String?) -> Unit,
+    onNavigateToMusic: () -> Unit,
+    onNavigateToStorage: () -> Unit,
+    onNavigateToConnectionManager: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        SectionHeader(
+            title = "WORKSPACES",
+            actionText = "Browse Root",
+            accentColor = accentColor,
+            onActionClick = { onNavigateToDrive("/") }
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            BentoWorkspaceTile(
+                title = "My Drive",
+                subtitle = "Explore host filesystem",
+                badge = "FILES",
+                icon = Icons.Default.Folder,
+                tint = accentColor,
+                onClick = { onNavigateToDrive(null) },
+                modifier = Modifier.weight(1f)
+            )
+            BentoWorkspaceTile(
+                title = "Music Library",
+                subtitle = "Stream audio & playlists",
+                badge = "AUDIO",
+                icon = Icons.Default.Headphones,
+                tint = StreamerGreen,
+                onClick = onNavigateToMusic,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            BentoWorkspaceTile(
+                title = "Storage & Hub",
+                subtitle = "Volumes & auth tokens",
+                badge = "SYSTEM",
+                icon = Icons.Default.Storage,
+                tint = StreamerPurple,
+                onClick = onNavigateToStorage,
+                modifier = Modifier.weight(1f)
+            )
+            BentoWorkspaceTile(
+                title = "Network & Host",
+                subtitle = displayHost,
+                badge = if (isServerOnline == true) "ACTIVE" else "SETUP",
+                icon = Icons.Default.Dns,
+                tint = StreamerOrange,
+                onClick = onNavigateToConnectionManager,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+fun BentoWorkspaceTile(
     title: String,
     subtitle: String,
     badge: String,
@@ -123,42 +198,6 @@ internal fun BentoWorkspaceTile(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-    }
-}
-
-@Composable
-internal fun SectionHeader(
-    title: String,
-    actionText: String? = null,
-    accentColor: Color,
-    onActionClick: (() -> Unit)? = null
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            color = TextTertiary,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.9.sp
-        )
-        if (actionText != null && onActionClick != null) {
-            Text(
-                text = actionText,
-                color = accentColor,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable(onClick = onActionClick)
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            )
         }
     }
 }

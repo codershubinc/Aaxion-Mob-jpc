@@ -8,7 +8,7 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import android.widget.Toast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast
 
 object DownloadHelper {
 
@@ -48,12 +48,12 @@ object DownloadHelper {
             val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val downloadId = manager.enqueue(request)
 
-            Toast.makeText(context, "Download started: $fileName", Toast.LENGTH_SHORT).show()
+            AaxionToast.show(context, "Download started: $fileName")
             registerCompletionReceiverIfNeeded(context.applicationContext)
             return downloadId
         } catch (e: Exception) {
             // Fallback to browser download intent if DownloadManager fails or is disabled
-            Toast.makeText(context, "Starting via browser...", Toast.LENGTH_SHORT).show()
+            AaxionToast.show(context, "Starting via browser...")
             IntentUtils.launchDownloadIntent(context, downloadUrl)
             return -1L
         }
@@ -67,7 +67,7 @@ object DownloadHelper {
                 if (intent?.action == DownloadManager.ACTION_DOWNLOAD_COMPLETE) {
                     val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
                     if (id != -1L && c != null) {
-                        Toast.makeText(c, "Download complete", Toast.LENGTH_SHORT).show()
+                        AaxionToast.show(c, "Download complete")
                     }
                 }
             }

@@ -23,8 +23,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.rememberScrollState
@@ -69,16 +72,69 @@ fun DriveFilesView(
     val context = LocalContext.current
     val accentColor = LocalAccentColor.current
     val tokenManager = androidx.compose.runtime.remember { TokenManager.getInstance(context) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var activeViewingFile by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<FileItem?>(null) }
     var pendingDownloadFile by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<FileItem?>(null) }
     var pendingResumeVideo by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Triple<FileItem, String, VideoProgress>?>(null) }
+    var showCreateFolderDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    val filePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            com.codershubinc.aaxion_mob.core.upload.UploadManager.getInstance(context).enqueueUploads(
+                context = context,
+                serverUri = serverUri,
+                token = token,
+                targetDir = viewModel.currentPath,
+                uris = uris
+            )
+            com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast.show(
+                context,
+                "Uploading ${uris.size} file${if (uris.size > 1) "s" else ""} in background"
+            )
+        }
+    }
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+
+    val currentDirType by viewModel.currentDirectoryMediaType.collectAsState()
+
+    // Sync directory media type when path changes
+    androidx.compose.runtime.LaunchedEffect(viewModel.currentPath) {
+        viewModel.updateCurrentDirectoryType(context)
+    }
 
     // Dynamically sync artwork when folder contents load or change
     androidx.compose.runtime.LaunchedEffect(viewModel.files) {
         if (viewModel.files.isNotEmpty()) {
             MediaPlayerManager.getInstance(context).syncArtworkIfAvailable(viewModel.files, serverUri, token)
+        }
+    }
+
+    // Auto-sync OMDB metadata when in Movies or Series directory
+    androidx.compose.runtime.LaunchedEffect(viewModel.files, currentDirType) {
+        if (viewModel.files.isNotEmpty() && currentDirType != com.codershubinc.aaxion_mob.core.media.DirectoryMediaType.NONE) {
+            com.codershubinc.aaxion_mob.core.network.OmdbClient.syncDirectory(context, viewModel.files, currentDirType)
+        }
+    }
+
+    // Auto-refresh active directory when background upload finishes
+    androidx.compose.runtime.LaunchedEffect(viewModel.currentPath, serverUri, token) {
+        com.codershubinc.aaxion_mob.core.upload.UploadManager.getInstance(context).uploadCompletedEvents.collect { completedTask ->
+            val cur = viewModel.currentPath.trimEnd('/')
+            val target = completedTask.targetDir.trimEnd('/')
+            val serverMatches = completedTask.serverUri.isBlank() || serverUri.isBlank() ||
+                completedTask.serverUri.trimEnd('/').equals(serverUri.trimEnd('/'), ignoreCase = true)
+            if (serverMatches && cur.equals(target, ignoreCase = true)) {
+                viewModel.fetchFiles(
+                    baseUrl = serverUri,
+                    token = token,
+                    path = viewModel.currentPath,
+                    tokenManager = tokenManager,
+                    context = context
+                )
+            }
         }
     }
 
@@ -102,6 +158,8 @@ fun DriveFilesView(
             isSidebarVisible = isSidebarVisible,
             onToggleSidebar = onToggleSidebar,
             onOpenConnectionManager = onOpenConnectionManager,
+            onUploadClick = { filePickerLauncher.launch(arrayOf("*/*")) },
+            onCreateFolderClick = { showCreateFolderDialog = true },
             isTablet = isTablet,
             isServerOnline = isServerOnline,
             isLocalConnection = isLocalConnection
@@ -304,6 +362,24 @@ fun DriveFilesView(
                 pendingResumeVideo = null
             },
             onDismiss = { pendingResumeVideo = null }
+        )
+    }
+
+    if (showCreateFolderDialog) {
+        CreateFolderModal(
+            parentPath = viewModel.currentPath,
+            onDismiss = { showCreateFolderDialog = false },
+            onConfirm = { name ->
+                showCreateFolderDialog = false
+                scope.launch {
+                    val success = viewModel.createDirectory(serverUri, token, name, tokenManager, context)
+                    if (success) {
+                        com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast.show(context, "Directory created")
+                    } else {
+                        com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast.show(context, "Failed to create directory")
+                    }
+                }
+            }
         )
     }
 }

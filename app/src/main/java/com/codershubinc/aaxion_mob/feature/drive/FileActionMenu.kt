@@ -3,7 +3,7 @@ package com.codershubinc.aaxion_mob.feature.drive
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Launch
@@ -27,6 +27,17 @@ import com.codershubinc.aaxion_mob.core.model.FileItem
 import com.codershubinc.aaxion_mob.core.network.buildDownloadUrl
 import com.codershubinc.aaxion_mob.core.network.buildStreamUrl
 import com.codershubinc.aaxion_mob.core.util.IntentUtils
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.ui.Alignment
+import com.codershubinc.aaxion_mob.core.data.OmdbMetadataCacheDb
+import com.codershubinc.aaxion_mob.core.media.DirectoryMediaType
+import com.codershubinc.aaxion_mob.core.media.MediaDirectoryManager
+import com.codershubinc.aaxion_mob.core.media.MediaTitleParser
 import com.codershubinc.aaxion_mob.ui.designsystem.GlassContextMenu
 import com.codershubinc.aaxion_mob.ui.designsystem.GlassMenuDivider
 import com.codershubinc.aaxion_mob.ui.theme.*
@@ -100,6 +111,13 @@ fun FileActionMenu(
             val videoProgress = remember(file.rawPath) { vlcManager.getProgress(file.rawPath) }
             val hasResume = videoProgress != null && videoProgress.positionMs >= 5000L
 
+            val omdb = remember(file.rawPath) { OmdbMetadataCacheDb.getInstance(context).get(file.rawPath) }
+            val parsedMedia = remember(file.name) { MediaTitleParser.parse(file.name) }
+            val cleanTitle = remember(omdb, parsedMedia, file.name) {
+                parsedMedia.getFormattedTitle(omdb?.title) ?: omdb?.title ?: file.displayName(40)
+            }
+            val posterUrl = omdb?.posterUrl
+
             if (hasResume) {
                 DropdownMenuItem(
                     text = { Text("Resume in VLC (${videoProgress.formattedPosition})", color = TextPrimary, fontSize = 13.sp) },
@@ -113,7 +131,7 @@ fun FileActionMenu(
                     },
                     onClick = {
                         onDismissRequest()
-                        vlcManager.launchVlc(context, file, streamUrl, resume = true, token = token)
+                        vlcManager.launchVlc(context, file, streamUrl, resume = true, token = token, customTitle = cleanTitle, posterUrl = posterUrl)
                     }
                 )
 
@@ -129,7 +147,7 @@ fun FileActionMenu(
                     },
                     onClick = {
                         onDismissRequest()
-                        vlcManager.launchVlc(context, file, streamUrl, resume = false, token = token)
+                        vlcManager.launchVlc(context, file, streamUrl, resume = false, token = token, customTitle = cleanTitle, posterUrl = posterUrl)
                     }
                 )
             } else {
@@ -145,7 +163,7 @@ fun FileActionMenu(
                     },
                     onClick = {
                         onDismissRequest()
-                        vlcManager.launchVlc(context, file, streamUrl, resume = false, token = token)
+                        vlcManager.launchVlc(context, file, streamUrl, resume = false, token = token, customTitle = cleanTitle, posterUrl = posterUrl)
                     }
                 )
             }
@@ -194,13 +212,77 @@ fun FileActionMenu(
                 },
                 onClick = {
                     onDismissRequest()
-                    IntentUtils.launchStreamIntent(context, streamUrl, isVideo = true, title = file.name)
+                    IntentUtils.launchStreamIntent(context, streamUrl, isVideo = true, title = cleanTitle, posterUrl = posterUrl)
                 }
             )
 
             if (!file.isDir) {
                 GlassMenuDivider()
             }
+        }
+
+        if (file.isDir) {
+            val dirManager = remember(context) { MediaDirectoryManager.getInstance(context) }
+            val currentExplicitType = remember(file.rawPath) { dirManager.getExplicitType(file.rawPath) }
+
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text("TV Series Folder", color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        if (currentExplicitType == DirectoryMediaType.SERIES) {
+                            Icon(Icons.Default.Check, contentDescription = "Active", tint = StreamerPurple, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.LiveTv, contentDescription = null, tint = StreamerPurple, modifier = Modifier.size(16.dp))
+                },
+                onClick = {
+                    onDismissRequest()
+                    dirManager.setDirectoryType(file.rawPath, DirectoryMediaType.SERIES)
+                    AaxionToast.show(context, "Marked as TV Series")
+                }
+            )
+
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text("Movies Folder", color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        if (currentExplicitType == DirectoryMediaType.MOVIES) {
+                            Icon(Icons.Default.Check, contentDescription = "Active", tint = StreamerOrange, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Movie, contentDescription = null, tint = StreamerOrange, modifier = Modifier.size(16.dp))
+                },
+                onClick = {
+                    onDismissRequest()
+                    dirManager.setDirectoryType(file.rawPath, DirectoryMediaType.MOVIES)
+                    AaxionToast.show(context, "Marked as Movies")
+                }
+            )
+
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text("Standard Folder (None)", color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        if (currentExplicitType == DirectoryMediaType.NONE) {
+                            Icon(Icons.Default.Check, contentDescription = "Active", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+                },
+                onClick = {
+                    onDismissRequest()
+                    dirManager.setDirectoryType(file.rawPath, DirectoryMediaType.NONE)
+                    AaxionToast.show(context, "Media designation cleared")
+                }
+            )
+
+            GlassMenuDivider()
         }
 
         if (!file.isDir) {
@@ -237,7 +319,7 @@ fun FileActionMenu(
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     val clip = ClipData.newPlainText("Stream URL", streamUrl)
                     clipboard.setPrimaryClip(clip)
-                    Toast.makeText(context, "Stream link copied", Toast.LENGTH_SHORT).show()
+                    AaxionToast.show(context, "Stream link copied")
                 }
             )
         }

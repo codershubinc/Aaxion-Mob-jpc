@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +47,8 @@ fun DriveTopBar(
     isSidebarVisible: Boolean,
     onToggleSidebar: () -> Unit,
     onOpenConnectionManager: (() -> Unit)? = null,
+    onUploadClick: (() -> Unit)? = null,
+    onCreateFolderClick: (() -> Unit)? = null,
     isTablet: Boolean,
     isServerOnline: Boolean?,
     isLocalConnection: Boolean,
@@ -107,6 +110,36 @@ fun DriveTopBar(
                 }
 
                 Spacer(modifier = Modifier.width(6.dp))
+
+                // Create Folder button
+                if (onCreateFolderClick != null) {
+                    IconButton(
+                        onClick = onCreateFolderClick,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CreateNewFolder,
+                            contentDescription = "New Folder",
+                            tint = TextPrimary,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+                }
+
+                // Upload Files button
+                if (onUploadClick != null) {
+                    IconButton(
+                        onClick = onUploadClick,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudUpload,
+                            contentDescription = "Upload Files",
+                            tint = accentColor,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+                }
 
                 // Grid / List toggle
                 IconButton(

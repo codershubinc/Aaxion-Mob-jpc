@@ -3,7 +3,7 @@ package com.codershubinc.aaxion_mob.core.util
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
+import com.codershubinc.aaxion_mob.ui.designsystem.AaxionToast
 import java.util.Locale
 
 object IntentUtils {
@@ -12,7 +12,13 @@ object IntentUtils {
      * Attempts to stream a video or audio URL directly to VLC (org.videolan.vlc).
      * Falls back to general media player chooser or browser if VLC is not installed.
      */
-    fun launchStreamIntent(context: Context, streamUrl: String, isVideo: Boolean, title: String? = null) {
+    fun launchStreamIntent(
+        context: Context,
+        streamUrl: String,
+        isVideo: Boolean,
+        title: String? = null,
+        posterUrl: String? = null
+    ) {
         val mimeType = if (isVideo) "video/*" else "audio/*"
         val uri = Uri.parse(streamUrl)
         val streamTitle = title ?: uri.lastPathSegment ?: "Media Stream"
@@ -24,6 +30,11 @@ object IntentUtils {
             putExtra("title", streamTitle)
             putExtra("extra_title", streamTitle)
             putExtra(Intent.EXTRA_TITLE, streamTitle)
+            if (!posterUrl.isNullOrBlank()) {
+                putExtra("artworkURL", posterUrl)
+                putExtra("poster", posterUrl)
+                putExtra("extra_artwork", posterUrl)
+            }
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
@@ -41,6 +52,11 @@ object IntentUtils {
                 putExtra("title", streamTitle)
                 putExtra("extra_title", streamTitle)
                 putExtra(Intent.EXTRA_TITLE, streamTitle)
+                if (!posterUrl.isNullOrBlank()) {
+                    putExtra("artworkURL", posterUrl)
+                    putExtra("poster", posterUrl)
+                    putExtra("extra_artwork", posterUrl)
+                }
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(Intent.createChooser(genericIntent, "Play with...").apply {
@@ -54,7 +70,7 @@ object IntentUtils {
                 }
                 context.startActivity(browserIntent)
             } catch (err: Exception) {
-                Toast.makeText(context, "Could not open stream", Toast.LENGTH_SHORT).show()
+                AaxionToast.show(context, "Could not open stream")
             }
         }
     }
@@ -92,7 +108,7 @@ object IntentUtils {
                 }
                 context.startActivity(browserIntent)
             } catch (err: Exception) {
-                Toast.makeText(context, "Could not open document", Toast.LENGTH_SHORT).show()
+                AaxionToast.show(context, "Could not open document")
             }
         }
     }

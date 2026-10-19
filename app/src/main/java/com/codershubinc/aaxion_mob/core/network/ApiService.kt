@@ -10,6 +10,9 @@ import retrofit2.http.*
 
 interface ApiService {
 
+    @GET(ApiEndpoints.PING)
+    suspend fun ping(): Response<com.codershubinc.aaxion_mob.core.model.PingResponse>
+
     @POST(ApiEndpoints.AUTH.LOGIN)
     suspend fun login(@Body body: Map<String, String>): Response<LoginResponse>
 
@@ -28,6 +31,20 @@ interface ApiService {
         @Query("dir") path: String,
         @Header("Authorization") token: String
     ): Response<List<FileItem>>
+
+    @POST(ApiEndpoints.FILES.CREATE_DIR)
+    suspend fun createDirectory(
+        @Query("path") path: String,
+        @Header("Authorization") token: String
+    ): Response<okhttp3.ResponseBody>
+
+    @Multipart
+    @POST(ApiEndpoints.FILES.UPLOAD)
+    suspend fun uploadFile(
+        @Query("dir") dir: String,
+        @Header("Authorization") token: String,
+        @Part file: okhttp3.MultipartBody.Part
+    ): Response<okhttp3.ResponseBody>
 
     @GET(ApiEndpoints.SYSTEM.GET_ROOT_PATH)
     suspend fun getRootPath(

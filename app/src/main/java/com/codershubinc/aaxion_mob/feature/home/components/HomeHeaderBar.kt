@@ -1,4 +1,4 @@
-package com.codershubinc.aaxion_mob.feature.home
+package com.codershubinc.aaxion_mob.feature.home.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,7 +25,7 @@ import com.codershubinc.aaxion_mob.ui.theme.*
 import java.util.Locale
 
 @Composable
-internal fun HomeHeaderBar(
+fun HomeHeaderBar(
     greeting: String,
     displayHost: String,
     isServerOnline: Boolean?,
@@ -33,7 +33,8 @@ internal fun HomeHeaderBar(
     accentColor: Color,
     onNavigateToConnectionManager: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val statusColor = when (isServerOnline) {
         true -> AaxionSuccess
@@ -47,7 +48,7 @@ internal fun HomeHeaderBar(
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -130,6 +131,43 @@ internal fun HomeHeaderBar(
                 iconSize = 18.dp,
                 tint = TextPrimary,
                 accentHighlight = accentColor
+            )
+        }
+    }
+}
+
+@Composable
+fun SectionHeader(
+    title: String,
+    actionText: String? = null,
+    accentColor: Color,
+    onActionClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            color = TextTertiary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.9.sp
+        )
+        if (actionText != null && onActionClick != null) {
+            Text(
+                text = actionText,
+                color = accentColor,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable(onClick = onActionClick)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             )
         }
     }
